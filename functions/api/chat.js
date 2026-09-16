@@ -1,9 +1,11 @@
 // Cloudflare Pages Function: POST /api/chat  (Gemini-Proxy + Test)
+const DEFAULT_MODEL = "gemini-flash-latest";
 const MODEL_CAP = {
-  "gemini-2.5-flash": 2000,
-  "gemini-2.5-flash-lite": 2000,
-  "gemini-2.5-pro": 2000,
-  "gemini-2.0-flash": 2000
+  "gemini-flash-latest": 2000,
+  "gemini-flash-lite-latest": 2000,
+  "gemini-3.6-flash": 2000,
+  "gemini-3.5-flash": 2000,
+  "gemini-pro-latest": 2000
 };
 
 function json(obj, status) {
@@ -21,7 +23,7 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "bad_json" }, 400); }
 
-  const model = MODEL_CAP[body.model] ? body.model : "gemini-2.5-flash";
+  const model = MODEL_CAP[body.model] ? body.model : DEFAULT_MODEL;
   const cap = MODEL_CAP[model];
   let max_tokens = parseInt(body.max_tokens, 10);
   if (!Number.isFinite(max_tokens) || max_tokens < 1) max_tokens = 400;
@@ -72,7 +74,7 @@ export async function onRequestGet(context) {
   if (url.searchParams.get("test") === "1") {
     const key = env.GEMINI_API_KEY;
     if (!key) return json({ test: "fail", reason: "GEMINI_API_KEY fehlt in Cloudflare (oder nicht neu deployt)" });
-    const model = "gemini-2.5-flash";
+    const model = DEFAULT_MODEL;
     const g = "https://generativelanguage.googleapis.com/v1beta/models/" + model +
       ":generateContent?key=" + encodeURIComponent(key);
     try {
