@@ -1,5 +1,6 @@
 // Cloudflare Pages Function: POST /api/chat  (Gemini-Proxy + Test)
 const DEFAULT_MODEL = "gemini-flash-latest";
+const FALLBACKS = ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-lite-latest"];
 const MODEL_CAP = {
   "gemini-flash-latest": 2000,
   "gemini-flash-lite-latest": 2000,
@@ -9,10 +10,28 @@ const MODEL_CAP = {
 };
 
 function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { "content-type": "application/json" }
-  });
+  return new Response(JSON.stringify(obj), { status: status || 200, headers: { "content-type": "application/json" } });
+}
+
+async function callGemini(model, key, payload) {
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
+  return fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+}
+
+async function generateWithFallback(key, payload, firstModel) {
+  const order = [firstModel].concat(FALLBACKS.filter((m) => m !== firstModel));
+  let lastStatus = 0, lastDetail = "";
+  for (const m of order) {
+    let r;
+    try { r = await callGemini(m, key, payload); }
+    catch (e) { lastDetail = String(e); continue; }
+    if (r.ok) return { ok: true, resp: r, model: m };
+    lastStatus = r.status;
+    lastDetail = await r.text().catch(() => "");
+    if (!(r.status === 429 || r.status >= 500)) break;
+  }
+  return { ok: false, status: lastStatus, detail: lastDetail };
 }
 
 export async function onRequestPost(context) {
@@ -37,28 +56,13 @@ export async function onRequestPost(context) {
     role: (m.role === "assistant" || m.role === "model") ? "model" : "user",
     parts: [{ text: String(m.content || "") }]
   }));
-
   const generationConfig = { maxOutputTokens: max_tokens, temperature: body.json ? 0.4 : 0.85 };
   if (body.json) generationConfig.responseMimeType = "application/json";
 
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
+  const out = await generateWithFallback(key, { contents, generationConfig }, model);
+  if (!out.ok) return json({ error: "upstream", status: out.status, detail: out.detail }, 502);
 
-  let up;
-  try {
-    up = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents, generationConfig })
-    });
-  } catch (e) { return json({ error: "network", detail: String(e) }, 502); }
-
-  if (!up.ok) {
-    const detail = await up.text().catch(() => "");
-    return json({ error: "upstream", status: up.status, detail }, 502);
-  }
-
-  const data = await up.json();
+  const data = await out.resp.json();
   let text = "";
   try {
     const parts = data && data.candidates && data.candidates[0] &&
@@ -74,18 +78,12 @@ export async function onRequestGet(context) {
   if (url.searchParams.get("test") === "1") {
     const key = env.GEMINI_API_KEY;
     if (!key) return json({ test: "fail", reason: "GEMINI_API_KEY fehlt in Cloudflare (oder nicht neu deployt)" });
-    const model = DEFAULT_MODEL;
-    const g = "https://generativelanguage.googleapis.com/v1beta/models/" + model +
-      ":generateContent?key=" + encodeURIComponent(key);
-    try {
-      const r = await fetch(g, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Di hola en español." }] }], generationConfig: { maxOutputTokens: 50 } })
-      });
-      const detail = await r.text();
-      return json({ test: r.ok ? "ok" : "fail", status: r.status, keyStart: String(key).slice(0, 4), detail: detail.slice(0, 900) });
-    } catch (e) { return json({ test: "fail", reason: "network", detail: String(e) }); }
+    const out = await generateWithFallback(key, {
+      contents: [{ role: "user", parts: [{ text: "Di hola en español." }] }],
+      generationConfig: { maxOutputTokens: 50 }
+    }, DEFAULT_MODEL);
+    if (out.ok) return json({ test: "ok", model: out.model, keyStart: String(key).slice(0, 4) });
+    return json({ test: "fail", status: out.status, keyStart: String(key).slice(0, 4), detail: String(out.detail).slice(0, 900) });
   }
   return json({ ok: true, service: "frecuencia-gemini-proxy" });
 }
