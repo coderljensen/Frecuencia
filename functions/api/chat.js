@@ -1,8 +1,4 @@
-// Cloudflare Pages Function: POST /api/chat
-// Proxies to the Google Gemini API (free tier). The API key lives only here
-// (env var GEMINI_API_KEY), never in the browser. Models are whitelisted and
-// output tokens are capped.
-
+// Cloudflare Pages Function: POST /api/chat  (Gemini-Proxy + Test)
 const MODEL_CAP = {
   "gemini-2.5-flash": 2000,
   "gemini-2.5-flash-lite": 2000,
@@ -19,7 +15,6 @@ function json(obj, status) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-
   const key = env.GEMINI_API_KEY;
   if (!key) return json({ error: "server_key_missing" }, 500);
 
@@ -36,16 +31,12 @@ export async function onRequestPost(context) {
   if (!messages || !messages.length) return json({ error: "no_messages" }, 400);
   if (JSON.stringify(messages).length > 60000) return json({ error: "too_large" }, 413);
 
-  // Gemini uses roles "user" / "model" and a `contents` array.
   const contents = messages.map((m) => ({
     role: (m.role === "assistant" || m.role === "model") ? "model" : "user",
     parts: [{ text: String(m.content || "") }]
   }));
 
-  const generationConfig = {
-    maxOutputTokens: max_tokens,
-    temperature: body.json ? 0.4 : 0.85
-  };
+  const generationConfig = { maxOutputTokens: max_tokens, temperature: body.json ? 0.4 : 0.85 };
   if (body.json) generationConfig.responseMimeType = "application/json";
 
   const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -58,9 +49,7 @@ export async function onRequestPost(context) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ contents, generationConfig })
     });
-  } catch (e) {
-    return json({ error: "network", detail: String(e) }, 502);
-  }
+  } catch (e) { return json({ error: "network", detail: String(e) }, 502); }
 
   if (!up.ok) {
     const detail = await up.text().catch(() => "");
@@ -77,6 +66,24 @@ export async function onRequestPost(context) {
   return json({ text });
 }
 
-export async function onRequestGet() {
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  if (url.searchParams.get("test") === "1") {
+    const key = env.GEMINI_API_KEY;
+    if (!key) return json({ test: "fail", reason: "GEMINI_API_KEY fehlt in Cloudflare (oder nicht neu deployt)" });
+    const model = "gemini-2.5-flash";
+    const g = "https://generativelanguage.googleapis.com/v1beta/models/" + model +
+      ":generateContent?key=" + encodeURIComponent(key);
+    try {
+      const r = await fetch(g, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Di hola en español." }] }], generationConfig: { maxOutputTokens: 50 } })
+      });
+      const detail = await r.text();
+      return json({ test: r.ok ? "ok" : "fail", status: r.status, keyStart: String(key).slice(0, 4), detail: detail.slice(0, 900) });
+    } catch (e) { return json({ test: "fail", reason: "network", detail: String(e) }); }
+  }
   return json({ ok: true, service: "frecuencia-gemini-proxy" });
 }
