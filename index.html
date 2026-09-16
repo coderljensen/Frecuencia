@@ -603,8 +603,8 @@
   /* ---------- persistence ---------- */
   const LS="frecuencia.v1";
   const defaults={cards:{}, settings:{newPer:15, modes:{listen:true,read:true,produce:true}, autoplay:true},
-                  streak:0, lastDay:null, theme:null, talks:[], lastEval:null, lastEvalResult:null, custom:[], activeStructures:[], level:"A2", register:"auto", mistakes:[], lastLessonDay:null};
-  function load(){ try{const j=JSON.parse(localStorage.getItem(LS)); if(j)return Object.assign({},defaults,j,{settings:Object.assign({},defaults.settings,j.settings),cards:j.cards||{},talks:j.talks||[],custom:j.custom||[],activeStructures:j.activeStructures||[],mistakes:j.mistakes||[]});}catch(e){} return JSON.parse(JSON.stringify(defaults)); }
+                  streak:0, lastDay:null, theme:null, talks:[], lastEval:null, lastEvalResult:null, custom:[], activeStructures:[], level:"A2", register:"auto", mistakes:[], lastLessonDay:null, storyCache:{}};
+  function load(){ try{const j=JSON.parse(localStorage.getItem(LS)); if(j)return Object.assign({},defaults,j,{settings:Object.assign({},defaults.settings,j.settings),cards:j.cards||{},talks:j.talks||[],custom:j.custom||[],activeStructures:j.activeStructures||[],mistakes:j.mistakes||[],storyCache:j.storyCache||{}});}catch(e){} return JSON.parse(JSON.stringify(defaults)); }
   function save(){ try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){} }
   let state=load();
 
@@ -954,7 +954,7 @@
     ["home","study","done","tab-struct","tab-lesen","tab-talk","tab-eval","tab-drill"].forEach(id=>{ const el=$("#"+id); if(el)el.hidden=true; });
     if(name==="cards"){ show("home"); }
     else if(name==="struct"){ $("#tab-struct").hidden=false; renderStructures(); }
-    else if(name==="lesen"){ $("#tab-lesen").hidden=false; }
+    else if(name==="lesen"){ $("#tab-lesen").hidden=false; openLesen(); }
     else if(name==="drill"){ $("#tab-drill").hidden=false; renderDrillMenu(); }
     else if(name==="talk"){ $("#tab-talk").hidden=false; renderTalkIntro(); }
     else if(name==="eval"){ $("#tab-eval").hidden=false; renderEvalHome(); }
@@ -972,7 +972,7 @@
   /* ============================================================
      CLAUDE (sample capability)
      ============================================================ */
-  const API_URL="/api/chat", MODEL_CHAT="gemini-2.5-flash", MODEL_EVAL="gemini-2.5-flash";
+  const API_URL="/api/chat", MODEL_CHAT="gemini-flash-latest", MODEL_EVAL="gemini-flash-latest";
   async function apiClaude(messages, opts){
     opts=opts||{};
     const res=await fetch(API_URL,{method:"POST",headers:{"content-type":"application/json"},
@@ -1510,28 +1510,51 @@
   /* ============================================================
      LESEN (short generated story at your level)
      ============================================================ */
-  let lesenTopic="la vida diaria";
+  let lesenTopic="la vida diaria", storyFilling=false;
   document.querySelectorAll("#lesenTopics .chip").forEach(c=>c.onclick=()=>{
     document.querySelectorAll("#lesenTopics .chip").forEach(x=>x.setAttribute("aria-pressed","false"));
     c.setAttribute("aria-pressed","true"); lesenTopic=c.dataset.t||"la vida diaria";
+    updateLesenStatus(); refillStories();
   });
-  $("#lesenBtn").onclick=generateStory;
-  async function generateStory(){
-    const lvl=state.level||"A2"; const note=$("#lesenNote"); note.className="micnote"; note.textContent="";
-    $("#lesenBtn").disabled=true; $("#lesenBtn").textContent="Schreibe…";
+  $("#lesenBtn").onclick=showNextStory;
+
+  function storyBuf(t){ if(!state.storyCache)state.storyCache={}; if(!state.storyCache[t])state.storyCache[t]=[]; return state.storyCache[t]; }
+  function updateLesenStatus(){
+    const n=storyBuf(lesenTopic).length; const note=$("#lesenNote"); note.className="micnote";
+    note.textContent = n>0 ? (n+" Geschichte"+(n>1?"n":"")+" bereit"+(storyFilling?" · Nachschub läuft…":"")) : (storyFilling?"Erste Geschichte wird vorbereitet…":"");
+  }
+  async function makeStory(topic){
+    const lvl=state.level||"A2";
     const prompt=[
-      "Escribe una historia MUY corta en español para un aprendiz de nivel "+lvl+" sobre: "+lesenTopic+".",
+      "Escribe una historia MUY corta en español para un aprendiz de nivel "+lvl+" sobre: "+topic+".",
       "5-8 frases, vocabulario y gramática adecuados a ese nivel, natural y entretenida.",
       'Devuelve SOLO un objeto JSON: {"titulo":"...","texto":"la historia completa","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
       "En glosario incluye 6-10 palabras o expresiones útiles que aparecen en el texto, con su traducción alemana."
     ].join("\n");
-    let data=null;
-    try{ const r=await apiClaude([{role:"user",content:prompt}],{model:MODEL_CHAT,max_tokens:900,json:true}); data=parseJSON(r.text); }
-    catch(e){ note.className="micnote warn"; note.textContent="Konnte keine Geschichte laden. Später erneut versuchen."; }
-    $("#lesenBtn").disabled=false; $("#lesenBtn").textContent="Neue Geschichte";
-    if(data && data.texto) renderStory(data);
-    else if(!note.textContent){ note.className="micnote warn"; note.textContent="Antwort nicht lesbar — nochmal versuchen."; }
+    try{ const r=await apiClaude([{role:"user",content:prompt}],{model:MODEL_CHAT,max_tokens:900,json:true}); const d=parseJSON(r.text); return (d&&d.texto)? d : null; }
+    catch(e){ return null; }
   }
+  async function refillStories(){
+    if(storyFilling) return; storyFilling=true; updateLesenStatus();
+    try{
+      let guard=0;
+      while(storyBuf(lesenTopic).length<3 && guard++<3){
+        const s=await makeStory(lesenTopic);
+        if(!s) break;
+        storyBuf(lesenTopic).push(s); save(); updateLesenStatus();
+      }
+    } finally { storyFilling=false; updateLesenStatus(); }
+  }
+  async function showNextStory(){
+    const buf=storyBuf(lesenTopic);
+    if(buf.length){ const s=buf.shift(); save(); renderStory(s); updateLesenStatus(); refillStories(); return; }
+    $("#lesenBtn").disabled=true; $("#lesenBtn").textContent="Schreibe…";
+    const s=await makeStory(lesenTopic);
+    $("#lesenBtn").disabled=false; $("#lesenBtn").textContent="Neue Geschichte";
+    if(s){ renderStory(s); } else { const note=$("#lesenNote"); note.className="micnote warn"; note.textContent="Konnte gerade keine Geschichte laden — gleich nochmal probieren."; }
+    refillStories();
+  }
+  function openLesen(){ updateLesenStatus(); if(!$("#lesenResult").innerHTML.trim() && storyBuf(lesenTopic).length){ showNextStory(); } refillStories(); }
   function renderStory(d){
     const glos=Array.isArray(d.glosario)?d.glosario:[];
     let prose=esc(d.texto||"");
