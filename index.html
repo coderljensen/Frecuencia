@@ -896,6 +896,16 @@
 
   const MODE_META={listen:{g:"🔊",l:"Hören → Verstehen"},read:{g:"👁",l:"Lesen → Verstehen"},produce:{g:"🗣",l:"Wiedergeben — sag es auf Spanisch"}};
 
+  // Nouns show their article (el/la) with the Spanish word, so you learn the gender.
+  function esArt(w){
+    if(!w) return "";
+    if(w.type==="sentence"||w.type==="fix"||w.type==="verb") return w.es;
+    const p=String(w.pos||"");
+    if(/S\(m\/f\)/.test(p)) return "el/la "+w.es;
+    if(/S\(m\)/.test(p)) return "el "+w.es;
+    if(/S\(f\)/.test(p)) return "la "+w.es;
+    return w.es;
+  }
   function renderCard(){
     const w=sess.current, mode=sess.mode, m=MODE_META[mode];
     const isSent = w.type==="sentence";
@@ -910,11 +920,11 @@
     if(mode==="listen"){
       body.innerHTML=`<button class="listen-btn" id="playBtn" aria-label="Anhören">🔊</button>
         <div class="prompt-sub">${isSent?"Hör zu — was bedeutet der Satz?":"Tippe zum Anhören · was bedeutet es?"}</div>`;
-      $("#playBtn").onclick=()=>speak(w.es);
-      setTimeout(()=>speak(w.es),180);
+      $("#playBtn").onclick=()=>speak(esArt(w));
+      setTimeout(()=>speak(esArt(w)),180);
     }else if(mode==="read"){
       if(isSent) body.innerHTML=`<div class="prompt-sentence">${esc(w.es)}</div><div class="frame-chip">${esc(w.pos)}</div><div class="prompt-sub">Was bedeutet dieser Satz?</div>`;
-      else body.innerHTML=`<div class="prompt-word">${esc(w.es)}</div>${w.pos?`<div class="pos">${esc(w.pos)}</div>`:""}<div class="prompt-sub">Was bedeutet dieses Wort?</div>`;
+      else body.innerHTML=`<div class="prompt-word">${esc(esArt(w))}</div>${w.pos?`<div class="pos">${esc(w.pos)}</div>`:""}<div class="prompt-sub">Was bedeutet dieses Wort?</div>`;
     }else{ // produce
       if(isSent) body.innerHTML=`<div class="prompt-sentence">${esc(w.de)}</div><div class="frame-chip">${esc(w.pos)}</div><div class="prompt-sub">Sag den Satz auf Spanisch</div>`;
       else body.innerHTML=`<div class="prompt-de">${esc(w.de)}</div>${w.pos?`<div class="pos">${esc(w.pos)}</div>`:""}<div class="prompt-sub">Wie heißt das auf Spanisch?</div>`;
@@ -944,13 +954,13 @@
         <div class="answer-de" style="color:var(--ink-soft);font-weight:500">${esc(w.de)}</div>
         <div class="frame-chip">${esc(w.pos)}</div>`;
     } else {
-      reveal.innerHTML=`<div class="answer-es"><span class="w">${esc(w.es)}</span>${audioBtn}</div>
+      reveal.innerHTML=`<div class="answer-es"><span class="w">${esc(esArt(w))}</span>${audioBtn}</div>
         ${w.pos?`<div class="pos">${esc(w.pos)}</div>`:""}
         <div class="answer-de">${esc(w.de)}</div>${ex}`;
     }
     $("#cardBody").appendChild(reveal);
-    $("#miniAudio").onclick=()=>speak(w.es);
-    if(state.settings.autoplay) speak(w.es);
+    $("#miniAudio").onclick=()=>speak(esArt(w));
+    if(state.settings.autoplay) speak(esArt(w));
     renderRate();
   }
 
