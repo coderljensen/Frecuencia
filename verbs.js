@@ -10,6 +10,14 @@ window.VERB_PERSONS = [
 
 // Pretérito perfecto = haber (present) + participio.
 window.HABER_PRES = ["he","has","ha","hemos","habéis","han"];
+// Presente continuo = estar (present) + gerundio. Irregular gerundios (regular = -ando / -iendo):
+window.GER = {
+  "ir":"yendo","poder":"pudiendo","decir":"diciendo","venir":"viniendo","traer":"trayendo",
+  "dormir":"durmiendo","pedir":"pidiendo","sentir":"sintiendo","seguir":"siguiendo","leer":"leyendo",
+  "oír":"oyendo","caer":"cayendo","morir":"muriendo","construir":"construyendo","reír":"riendo",
+  "repetir":"repitiendo","servir":"sirviendo","preferir":"prefiriendo","mentir":"mintiendo",
+  "elegir":"eligiendo","conseguir":"consiguiendo","corregir":"corrigiendo"
+};
 // Irregular past participles (regular = -ado / -ido, handled by rule).
 window.PART = {
   "escribir":"escrito", "abrir":"abierto", "hacer":"hecho", "decir":"dicho",

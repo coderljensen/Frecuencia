@@ -523,12 +523,22 @@
       <div class="panel">
         <h2>Konjugation üben</h2>
         <p class="hint">Wähle Zeit(en) und Verbtyp. Dann zeigt die App „Verb — Person (Zeit)" und du bildest die Form.</p>
-        <div class="ctrl" style="padding-top:0"><div><div class="cl">Zeiten</div><div class="cd">Mehrere möglich</div></div></div>
+        <div class="ctrl" style="padding-top:0"><div><div class="cl">📘 Zeitform kurz erklärt</div><div class="cd">Antippen für Regel &amp; Beispiel</div></div></div>
+        <div class="topics" id="verbInfoBtns">
+          <button class="chip" type="button" data-ti="pres">Präsens</button>
+          <button class="chip" type="button" data-ti="pret">Indefinido</button>
+          <button class="chip" type="button" data-ti="imp">Imperfecto</button>
+          <button class="chip" type="button" data-ti="perf">Perfecto</button>
+          <button class="chip" type="button" data-ti="cont">Pres. continuo</button>
+          <button class="chip" type="button" data-ti="fut">Futur</button>
+        </div>
+        <div class="ctrl"><div><div class="cl">Zeiten üben</div><div class="cd">Mehrere möglich</div></div></div>
         <div class="topics" id="verbTenses">
           <button class="chip" data-vt="pres" aria-pressed="true"><span class="dot"></span>+ Präsens</button>
           <button class="chip" data-vt="pret" aria-pressed="false"><span class="dot"></span>+ Indefinido</button>
           <button class="chip" data-vt="imp" aria-pressed="false"><span class="dot"></span>+ Imperfecto</button>
           <button class="chip" data-vt="perf" aria-pressed="false"><span class="dot"></span>+ Perfecto</button>
+          <button class="chip" data-vt="cont" aria-pressed="false"><span class="dot"></span>+ Pres. continuo</button>
           <button class="chip" data-vt="fut" aria-pressed="false"><span class="dot"></span>+ Futur</button>
         </div>
         <div class="ctrl"><div><div class="cl">Verbtyp</div><div class="cd">Regelmäßig und/oder unregelmäßig</div></div></div>
@@ -540,6 +550,7 @@
         <p class="micnote" id="verbConjNote"></p>
       </div>
     </div>
+    <div id="verbInfo" hidden></div>
     <div id="verbPlay" hidden>
       <div class="card">
         <div class="card-mode"><span class="glyph" id="verbGlyph">🔤</span><span id="verbLabel">Verben</span><span class="rank" id="verbRank"></span></div>
@@ -1744,9 +1755,10 @@
   /* ============================================================
      VERBEN tab — infinitive learning + conjugation drills
      ============================================================ */
-  const TENSE_LABEL={pres:"Präsens",pret:"Indefinido",imp:"Imperfecto",perf:"Perfecto",fut:"Futur"};
+  const TENSE_LABEL={pres:"Präsens",pret:"Indefinido",imp:"Imperfecto",perf:"Perfecto",cont:"Presente continuo",fut:"Futur"};
   function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
   function participio(v){ if((window.PART||{})[v.inf]) return window.PART[v.inf]; return v.inf.slice(0,-2)+(v.grp==="ar"?"ado":"ido"); }
+  function gerundio(v){ if((window.GER||{})[v.inf]) return window.GER[v.inf]; return v.inf.slice(0,-2)+(v.grp==="ar"?"ando":"iendo"); }
   function conjReg(inf,grp,tense,pi){
     const stem=inf.slice(0,-2);
     if(tense==="pres"){ const e={ar:["o","as","a","amos","áis","an"],er:["o","es","e","emos","éis","en"],ir:["o","es","e","imos","ís","en"]}[grp]||[]; return stem+(e[pi]||""); }
@@ -1756,12 +1768,37 @@
   }
   function conjOf(v,tense,pi){
     if(tense==="perf"){ return (window.HABER_PRES||[])[pi]+" "+participio(v); }
+    if(tense==="cont"){ const est=((window.VERBCONJ||{}).estar||{}).pres||["estoy","estás","está","estamos","estáis","están"]; return est[pi]+" "+gerundio(v); }
     const T=(window.VERBCONJ||{})[v.inf]; if(T && T[tense]) return T[tense][pi];
     return conjReg(v.inf,v.grp,tense,pi);
   }
 
   let verbSess=null, verbInfCount=150;
-  function showVerbView(v){ ["verbMenu","verbInfSetup","verbConjSetup","verbPlay"].forEach(id=>{ const el=$("#"+id); if(el) el.hidden=(id!==v); }); }
+  function showVerbView(v){ ["verbMenu","verbInfSetup","verbConjSetup","verbInfo","verbPlay"].forEach(id=>{ const el=$("#"+id); if(el) el.hidden=(id!==v); }); }
+  const TENSE_INFO={
+    pres:{name:"Präsens",wann:"Gegenwart, Gewohnheiten und allgemeine Wahrheiten (z. B. «trabajo todos los días»).",wie:"Verbstamm + Endung. -ar: -o/-as/-a/-amos/-áis/-an · -er: -o/-es/-e/-emos/-éis/-en · -ir: -o/-es/-e/-imos/-ís/-en.",bsp:"hablo · comes · vive"},
+    pret:{name:"Pretérito indefinido",wann:"Abgeschlossene Handlung in der Vergangenheit mit Zeitpunkt: gestern, letztes Jahr, plötzlich.",wie:"Stamm + Endung. -ar: -é/-aste/-ó/-amos/-asteis/-aron · -er/-ir: -í/-iste/-ió/-imos/-isteis/-ieron.",bsp:"hablé · comió · vivieron"},
+    imp:{name:"Pretérito imperfecto",wann:"Gewohnheiten, Zustände und Beschreibungen in der Vergangenheit (früher …, als ich Kind war …).",wie:"Stamm + Endung. -ar: -aba/-abas/-aba/-ábamos/-abais/-aban · -er/-ir: -ía/-ías/-ía/-íamos/-íais/-ían. Nur ser, ir, ver sind unregelmäßig.",bsp:"hablaba · comía · era"},
+    perf:{name:"Pretérito perfecto",wann:"Abgeschlossene Handlung mit Bezug zur Gegenwart: heute, schon, noch nicht, jemals.",wie:"haber (he/has/ha/hemos/habéis/han) + Partizip (-ado bei -ar, -ido bei -er/-ir).",bsp:"he hablado · has comido · ha vivido"},
+    cont:{name:"Presente continuo",wann:"Was gerade in diesem Moment passiert (ich bin gerade am …).",wie:"estar (estoy/estás/está/estamos/estáis/están) + Gerundio (-ando bei -ar, -iendo bei -er/-ir).",bsp:"estoy hablando · está comiendo"},
+    fut:{name:"Futuro simple",wann:"Zukunft und Vermutungen: ich werde …",wie:"Ganzer Infinitiv + Endung: -é/-ás/-á/-emos/-éis/-án.",bsp:"hablaré · comerás · vivirán"}
+  };
+  function showTenseInfo(t){
+    const info=TENSE_INFO[t]; if(!info) return;
+    $("#verbInfo").innerHTML=`<div class="panel">
+      <div class="cd" style="letter-spacing:.08em">ZEITFORM</div>
+      <div class="st-name" style="font-family:var(--serif);font-size:21px;margin-top:4px">${esc(info.name)}</div>
+      <div style="margin-top:14px"><div class="cd">Wann benutzt man sie?</div><div style="font-size:14.5px;margin-top:3px;line-height:1.55">${esc(info.wann)}</div></div>
+      <div style="margin-top:13px"><div class="cd">Wie wird sie gebildet?</div><div style="font-size:14.5px;margin-top:3px;line-height:1.55">${esc(info.wie)}</div></div>
+      <div style="margin-top:13px"><div class="cd">Beispiele</div><div class="answer-sentence" style="font-size:18px;margin-top:5px">${esc(info.bsp)}</div></div>
+      <button class="cta" id="tiPractice" type="button" style="margin-top:18px">Diese Zeit üben</button>
+      <button class="cta ghost" id="tiBack" type="button" style="margin-top:9px">Zurück</button>
+    </div>`;
+    showVerbView("verbInfo"); window.scrollTo(0,0);
+    $("#tiBack").onclick=()=>showVerbView("verbConjSetup");
+    $("#tiPractice").onclick=()=>startVerbConj([t]);
+  }
+  document.querySelectorAll("#verbInfoBtns .chip").forEach(b=>b.onclick=()=>showTenseInfo(b.dataset.ti));
   function renderVerbMenu(){ showVerbView("verbMenu"); verbSess=null; $("#verbCount").textContent=""; }
   function updateVerbCount(){ if(verbSess) $("#verbCount").textContent=verbSess.right+" / "+verbSess.total+(verbSess.mode==="inf"?" gewusst":" richtig"); }
 
@@ -1808,8 +1845,10 @@
 
   /* --- conjugation --- */
   $("#verbConjStart").onclick=startVerbConj;
-  function startVerbConj(){
-    const tenses=[...document.querySelectorAll("#verbTenses .chip")].filter(c=>c.getAttribute("aria-pressed")==="true").map(c=>c.dataset.vt);
+  function startVerbConj(tensesOverride){
+    const tenses = (Array.isArray(tensesOverride) && tensesOverride.length)
+      ? tensesOverride
+      : [...document.querySelectorAll("#verbTenses .chip")].filter(c=>c.getAttribute("aria-pressed")==="true").map(c=>c.dataset.vt);
     const types=[...document.querySelectorAll("#verbTypes .chip")].filter(c=>c.getAttribute("aria-pressed")==="true").map(c=>c.dataset.vy);
     const note=$("#verbConjNote"); note.className="micnote"; note.textContent="";
     if(!tenses.length){ note.className="micnote warn"; note.textContent="Wähle mindestens eine Zeit."; return; }
