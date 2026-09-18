@@ -479,6 +479,14 @@
     <div class="panel">
       <h2>Lesen auf deinem Niveau</h2>
       <p class="hint">Eine kurze Geschichte, passend zu deinem Niveau. Tippe ein unbekanntes Wort an → Bedeutung + „ins Deck". So baust du Verständnis und Wortschatz auf.</p>
+      <div class="ctrl" style="padding-top:0"><div><div class="cl">Dein Niveau</div><div class="cd">Länge &amp; Schwierigkeit · aktualisiert sich auch nach Auswertungen</div></div></div>
+      <div class="topics" id="lesenLevels">
+        <button class="chip" data-ll="A1" type="button"><span class="dot"></span>A1</button>
+        <button class="chip" data-ll="A2" type="button"><span class="dot"></span>A2</button>
+        <button class="chip" data-ll="B1" type="button"><span class="dot"></span>B1</button>
+        <button class="chip" data-ll="B2" type="button"><span class="dot"></span>B2</button>
+      </div>
+      <div class="ctrl"><div><div class="cl">Thema</div></div></div>
       <div class="topics" id="lesenTopics">
         <button class="chip" data-t="la vida diaria" aria-pressed="true"><span class="dot"></span>Alltag</button>
         <button class="chip" data-t="un viaje"><span class="dot"></span>Reise</button>
@@ -1594,8 +1602,8 @@
     const t=now();
     const due=items.filter(w=>state.cards[w.id] && state.cards[w.id].due<=t).map(w=>w.id);
     const neu=items.filter(w=>!state.cards[w.id]).map(w=>w.id);
-    const queue=due.concat(neu);
-    if(!queue.length){ toast("Diese Struktur ist gerade nicht fällig — schon gut gelernt!"); return; }
+    let queue=due.concat(neu);
+    if(!queue.length){ queue=shuffle(items.map(w=>w.id)); toast("Schon gelernt — wir wiederholen sie trotzdem 👍"); }
     sess={queue, planned:queue.length, done:0, right:0, total:0, newLearned:new Set()};
     if("speechSynthesis" in window){ try{speechSynthesis.resume();}catch(e){} }
     gotoStudy(); nextCard();
@@ -1703,6 +1711,11 @@
     updateLesenStatus(); refillStories();
   });
   $("#lesenBtn").onclick=showNextStory;
+  function syncLesenLevel(){ document.querySelectorAll("#lesenLevels .chip").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.ll===(state.level||"A2")))); }
+  document.querySelectorAll("#lesenLevels .chip").forEach(c=>c.onclick=()=>{
+    state.level=c.dataset.ll||"A2"; save(); syncLesenLevel();
+    toast("Niveau "+state.level+" — neue Geschichten passen sich an");
+  });
 
   function storyBuf(t){ if(!state.storyCache)state.storyCache={}; if(!state.storyCache[t])state.storyCache[t]=[]; return state.storyCache[t]; }
   function updateLesenStatus(){
@@ -1711,14 +1724,20 @@
   }
   async function makeStory(topic){
     const lvl=state.level||"A2";
+    const withDialog=Math.random()<0.45;
     const prompt=[
       "Escribe una historia MUY corta en español para un aprendiz de nivel "+lvl+" sobre: "+topic+".",
       "5-8 frases, vocabulario y gramática adecuados a ese nivel, natural y entretenida.",
+      withDialog ? "Incluye DIÁLOGO entre dos personas (usa guiones — para las intervenciones), no solo narración." : "Escríbela como una narración breve.",
       'Devuelve SOLO un objeto JSON: {"titulo":"...","texto":"la historia completa","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
       "En glosario incluye 6-10 palabras o expresiones útiles que aparecen en el texto, con su traducción alemana."
     ].join("\n");
-    try{ const r=await apiClaude([{role:"user",content:prompt}],{model:MODEL_CHAT,max_tokens:900,json:true}); const d=parseJSON(r.text); return (d&&d.texto)? d : null; }
-    catch(e){ return null; }
+    for(let attempt=0; attempt<2; attempt++){
+      try{ const r=await apiClaude([{role:"user",content:prompt}],{model:MODEL_CHAT,max_tokens:1100,json:true}); const d=parseJSON(r.text); if(d&&d.texto) return d; }
+      catch(e){}
+      await new Promise(r=>setTimeout(r,700));
+    }
+    return null;
   }
   function allLesenTopics(){ return [...document.querySelectorAll("#lesenTopics .chip")].map(c=>c.dataset.t||"la vida diaria"); }
   async function refillStories(){
@@ -1728,11 +1747,10 @@
       const topics=[lesenTopic].concat(allLesenTopics().filter(t=>t!==lesenTopic));
       for(const topic of topics){
         let guard=0;
-        while(storyBuf(topic).length<3 && guard++<3){
+        while(storyBuf(topic).length<3 && guard++<4){
           const s=await makeStory(topic);
-          if(!s) break;
-          storyBuf(topic).push(s); save();
-          if(topic===lesenTopic) updateLesenStatus();
+          if(s){ storyBuf(topic).push(s); save(); if(topic===lesenTopic) updateLesenStatus(); }
+          await new Promise(r=>setTimeout(r,800));   // gentle pacing → avoid rate-limit failures
         }
       }
     } finally { storyFilling=false; updateLesenStatus(); }
@@ -1746,7 +1764,7 @@
     if(s){ renderStory(s); } else { const note=$("#lesenNote"); note.className="micnote warn"; note.textContent="Konnte gerade keine Geschichte laden — gleich nochmal probieren."; }
     refillStories();
   }
-  function openLesen(){ updateLesenStatus(); if(!$("#lesenResult").innerHTML.trim() && storyBuf(lesenTopic).length){ showNextStory(); } refillStories(); }
+  function openLesen(){ syncLesenLevel(); updateLesenStatus(); if(!$("#lesenResult").innerHTML.trim() && storyBuf(lesenTopic).length){ showNextStory(); } refillStories(); }
   function renderStory(d){
     const glos=Array.isArray(d.glosario)?d.glosario:[];
     let prose=esc(d.texto||"");
