@@ -514,6 +514,7 @@
           <button class="chip" data-vc="50" aria-pressed="false"><span class="dot"></span>Top 50</button>
           <button class="chip" data-vc="100" aria-pressed="false"><span class="dot"></span>Top 100</button>
           <button class="chip" data-vc="150" aria-pressed="true"><span class="dot"></span>Top 150</button>
+          <button class="chip" data-vc="all" aria-pressed="false"><span class="dot"></span>Alle (+ Slang)</button>
         </div>
         <button class="cta" id="verbInfStart">Starten</button>
       </div>
@@ -655,6 +656,7 @@
 <script src="structures.js"></script>
 <script src="drills.js"></script>
 <script src="verbs.js"></script>
+<script src="slang.js"></script>
 <script>
 (function(){
   "use strict";
@@ -713,6 +715,17 @@
     });
   }
   appendMistakes();
+
+  /* slang words → reward cards (string ids so numeric progress ids never shift).
+     Slang verbs also go into the Verben tab (VERBLIST), marked (Slang). */
+  function appendSlang(){
+    (window.SLANG||[]).forEach((r,i)=>{ const k=(r[0]||"").toLowerCase(); if(!k||deckSeen.has(k))return; deckSeen.add(k);
+      DECK.push({id:"sl_"+i, es:r[0], de:r[1], pos:r[2]||"S (Slang)", exEs:"", exDe:"", isSlang:true}); });
+    (window.SLANG_VERBS||[]).forEach((v,j)=>{ const k=(v[0]||"").toLowerCase();
+      if(k && !deckSeen.has(k)){ deckSeen.add(k); DECK.push({id:"slv_"+j, es:v[0], de:v[1]+" (Slang)", pos:"V (Slang)", exEs:"", exDe:"", isSlang:true}); }
+      if(window.VERBLIST && !window.VERBLIST.some(x=>x[0]===v[0])) window.VERBLIST.push([v[0], v[1]+" (Slang)", v[2], v[3]]); });
+  }
+  appendSlang();
 
   /* card SRS record: {phase:'learning'|'review', step, ease, ivl(days), reps, lapses, due} */
   function rec(id){ return state.cards[id]; }
@@ -783,6 +796,23 @@
   let sess=null; // {queue:[ids], done:0, planned:int, newLearned:Set, right:0, total:0, current, revealed, mode}
   const enabledModes=()=>Object.keys(state.settings.modes).filter(m=>state.settings.modes[m]);
 
+  // New-card order: active-structure sentences first, then frequency words, with a
+  // slang word woven in ~every 10th card once you've learned 300+ words (a reward).
+  function pickNewCards(n){
+    const newSent=DECK.filter(w=>w.type==="sentence" && !state.cards[w.id]);
+    const newWord=DECK.filter(w=>w.type!=="sentence" && !w.isVerb && !w.isSlang && !state.cards[w.id]);
+    const newSlang=DECK.filter(w=>w.isSlang && !state.cards[w.id]);
+    const out=newSent.slice();
+    let learned=introduced(), wi=0, si=0, lastSlang=-1;
+    while(out.length<n && (wi<newWord.length || si<newSlang.length)){
+      const slangSlot = (learned>=300 && learned%10===0 && learned!==lastSlang && si<newSlang.length);
+      if(slangSlot){ out.push(newSlang[si++]); lastSlang=learned; }
+      else if(wi<newWord.length){ out.push(newWord[wi++]); learned++; }
+      else if(si<newSlang.length){ out.push(newSlang[si++]); }
+      else break;
+    }
+    return out.slice(0,n).map(w=>w.id);
+  }
   function buildSession(onlyReview){
     const t=now();
     const dueIds=DECK.filter(w=>!w.isVerb && state.cards[w.id] && state.cards[w.id].due<=t).map(w=>w.id);
@@ -790,10 +820,7 @@
     let queue=dueIds.slice();
     let planned=dueIds.length;
     if(!onlyReview){
-      // active-structure sentences come first (your weekly focus), then words by frequency
-      const newSent=DECK.filter(w=>w.type==="sentence" && !state.cards[w.id]);
-      const newWord=DECK.filter(w=>w.type!=="sentence" && !w.isVerb && !state.cards[w.id]);
-      const newIds=newSent.concat(newWord).slice(0,state.settings.newPer).map(w=>w.id);
+      const newIds=pickNewCards(state.settings.newPer);
       newIds.forEach((id,i)=>{ const pos=Math.min(queue.length, Math.round((i+1)*(queue.length+newIds.length)/(newIds.length+1))); queue.splice(pos,0,id); });
       planned+=newIds.length;
     }
@@ -1740,14 +1767,14 @@
 
   document.querySelectorAll("#verbMenu [data-vmode]").forEach(b=>b.onclick=()=>{ showVerbView(b.dataset.vmode==="inf"?"verbInfSetup":"verbConjSetup"); });
   $("#verbQuit").onclick=()=>{ if($("#verbMenu").hidden) renderVerbMenu(); else showTab("cards"); };
-  document.querySelectorAll("#verbCounts .chip").forEach(c=>c.onclick=()=>{ document.querySelectorAll("#verbCounts .chip").forEach(x=>x.setAttribute("aria-pressed","false")); c.setAttribute("aria-pressed","true"); verbInfCount=+c.dataset.vc||150; });
+  document.querySelectorAll("#verbCounts .chip").forEach(c=>c.onclick=()=>{ document.querySelectorAll("#verbCounts .chip").forEach(x=>x.setAttribute("aria-pressed","false")); c.setAttribute("aria-pressed","true"); verbInfCount = c.dataset.vc==="all" ? "all" : (+c.dataset.vc||150); });
   document.querySelectorAll("#verbTenses .chip").forEach(c=>c.onclick=()=>{ c.setAttribute("aria-pressed", c.getAttribute("aria-pressed")==="true"?"false":"true"); });
   document.querySelectorAll("#verbTypes .chip").forEach(c=>c.onclick=()=>{ c.setAttribute("aria-pressed", c.getAttribute("aria-pressed")==="true"?"false":"true"); });
 
   /* --- infinitive learning --- */
   $("#verbInfStart").onclick=startVerbInf;
   function startVerbInf(){
-    const list=(window.VERBLIST||[]).slice(0,verbInfCount);
+    const list = verbInfCount==="all" ? (window.VERBLIST||[]).slice() : (window.VERBLIST||[]).slice(0,verbInfCount);
     const kn=state.verbKnown||{};
     const queue=shuffle(list.filter(v=>!kn[v[0]])).concat(shuffle(list.filter(v=>kn[v[0]])));
     if(!queue.length){ toast("Keine Verben verfügbar"); return; }

@@ -1,8 +1,8 @@
-const CACHE = "frecuencia-v7";
+const CACHE = "frecuencia-v8";
 const ASSETS = [
   "./", "index.html",
   "words.js", "words2.js", "words3.js", "words4.js", "words5.js", "words6.js",
-  "structures.js", "drills.js", "verbs.js", "manifest.webmanifest", "icon.svg"
+  "structures.js", "drills.js", "verbs.js", "slang.js", "manifest.webmanifest", "icon.svg"
 ];
 
 self.addEventListener("install", (e) => {
