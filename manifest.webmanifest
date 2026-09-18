@@ -1,0 +1,16 @@
+{
+  "name": "Frecuencia — Spanisch lernen",
+  "short_name": "Frecuencia",
+  "description": "Spanisch nach Häufigkeit: Karteikarten, Grammatik-Muster und Sprechen mit Lucía.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4EFE6",
+  "theme_color": "#2E5A8F",
+  "lang": "de",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
