@@ -1,0 +1,5 @@
+_app.js
+app_extracted.js
+*.log
+.DS_Store
+Thumbs.db
