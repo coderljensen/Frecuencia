@@ -896,14 +896,15 @@
 
   const MODE_META={listen:{g:"🔊",l:"Hören → Verstehen"},read:{g:"👁",l:"Lesen → Verstehen"},produce:{g:"🗣",l:"Wiedergeben — sag es auf Spanisch"}};
 
-  // Nouns show their article (el/la) with the Spanish word, so you learn the gender.
+  // Nouns show their article (el/la; plural los/las) so you learn the gender.
+  const PLURAL_NOUNS = new Set(["días","padres","gafas","deberes","tijeras","vacaciones","celos","ganas","ojos","hombres","horas"]);
   function esArt(w){
     if(!w) return "";
     if(w.type==="sentence"||w.type==="fix"||w.type==="verb") return w.es;
-    const p=String(w.pos||"");
-    if(/S\(m\/f\)/.test(p)) return "el/la "+w.es;
-    if(/S\(m\)/.test(p)) return "el "+w.es;
-    if(/S\(f\)/.test(p)) return "la "+w.es;
+    const p=String(w.pos||""), pl=PLURAL_NOUNS.has(String(w.es||"").toLowerCase());
+    if(/S\(m\/f\)/.test(p)) return (pl?"los/las ":"el/la ")+w.es;
+    if(/S\(m\)/.test(p)) return (pl?"los ":"el ")+w.es;
+    if(/S\(f\)/.test(p)) return (pl?"las ":"la ")+w.es;
     return w.es;
   }
   function renderCard(){
