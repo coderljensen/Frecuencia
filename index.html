@@ -508,13 +508,13 @@
     <div id="verbInfSetup" hidden>
       <div class="panel">
         <h2>Infinitive lernen</h2>
-        <p class="hint">Lerne die Bedeutung der häufigsten Verben — wie Karteikarten.</p>
+        <p class="hint">Lerne die Bedeutung der wichtigsten Verben mit echtem Wiederholungssystem (1 Min · 10 Min · Tage). Sie kommen automatisch in deine Wiederholungen und in die Tageslektion zurück.</p>
         <div class="ctrl" style="padding-top:0"><div><div class="cl">Wie viele Verben?</div><div class="cd">Nach Häufigkeit geordnet</div></div></div>
         <div class="topics" id="verbCounts">
           <button class="chip" data-vc="50" aria-pressed="false"><span class="dot"></span>Top 50</button>
           <button class="chip" data-vc="100" aria-pressed="false"><span class="dot"></span>Top 100</button>
           <button class="chip" data-vc="150" aria-pressed="true"><span class="dot"></span>Top 150</button>
-          <button class="chip" data-vc="all" aria-pressed="false"><span class="dot"></span>Alle (+ Slang)</button>
+          <button class="chip" data-vc="all" aria-pressed="false"><span class="dot"></span>Alle</button>
         </div>
         <button class="cta" id="verbInfStart">Starten</button>
       </div>
@@ -736,7 +736,17 @@
       if(k && !deckSeen.has(k)){ deckSeen.add(k); DECK.push({id:"slv_"+j, es:v[0], de:v[1]+" (Slang)", pos:"V (Slang)", exEs:"", exDe:"", isSlang:true}); }
       if(window.VERBLIST && !window.VERBLIST.some(x=>x[0]===v[0])) window.VERBLIST.push([v[0], v[1]+" (Slang)", v[2], v[3]]); });
   }
+  const CORE_VERB_COUNT = (window.VERBLIST||[]).length;   // before appendSlang adds slang verbs
   appendSlang();
+
+  /* Verb infinitives become SRS cards (type "verb"): same spaced repetition as words,
+     introduced via the Verben tab, and they resurface as due reviews in normal
+     sessions / the daily lesson. String ids -> no shift of existing progress. */
+  function appendVerbCards(){
+    for(let i=0;i<CORE_VERB_COUNT;i++){ const v=(window.VERBLIST||[])[i]; if(!v) continue;
+      DECK.push({id:"vb_"+i, verbIdx:i, es:v[0], de:v[1], pos:(v[2]?"Verb":"Verb · unregelmäßig"), type:"verb", exEs:"", exDe:""}); }
+  }
+  appendVerbCards();
 
   /* card SRS record: {phase:'learning'|'review', step, ease, ivl(days), reps, lapses, due} */
   function rec(id){ return state.cards[id]; }
@@ -811,7 +821,7 @@
   // slang word woven in ~every 10th card once you've learned 300+ words (a reward).
   function pickNewCards(n){
     const newSent=DECK.filter(w=>w.type==="sentence" && !state.cards[w.id]);
-    const newWord=DECK.filter(w=>w.type!=="sentence" && !w.isVerb && !w.isSlang && !state.cards[w.id]);
+    const newWord=DECK.filter(w=>w.type!=="sentence" && w.type!=="verb" && !w.isVerb && !w.isSlang && !state.cards[w.id]);
     const newSlang=DECK.filter(w=>w.isSlang && !state.cards[w.id]);
     const out=newSent.slice();
     let learned=introduced(), wi=0, si=0, lastSlang=-1;
@@ -890,7 +900,7 @@
     const w=sess.current, mode=sess.mode, m=MODE_META[mode];
     const isSent = w.type==="sentence";
     $("#modeGlyph").textContent=m.g; $("#modeLabel").textContent=m.l;
-    $("#cardRank").textContent = isSent ? w.struct : ("#"+(w.id+1));
+    $("#cardRank").textContent = isSent ? w.struct : (w.type==="verb" ? "Verb" : (w.isSlang ? "Slang" : (typeof w.id==="number" ? ("#"+(w.id+1)) : "")));
     const body=$("#cardBody");
     if(w.type==="fix"){
       $("#modeGlyph").textContent="✏️"; $("#modeLabel").textContent="Fehler korrigieren"; $("#cardRank").textContent="deine Korrektur";
@@ -1698,14 +1708,20 @@
     try{ const r=await apiClaude([{role:"user",content:prompt}],{model:MODEL_CHAT,max_tokens:900,json:true}); const d=parseJSON(r.text); return (d&&d.texto)? d : null; }
     catch(e){ return null; }
   }
+  function allLesenTopics(){ return [...document.querySelectorAll("#lesenTopics .chip")].map(c=>c.dataset.t||"la vida diaria"); }
   async function refillStories(){
     if(storyFilling) return; storyFilling=true; updateLesenStatus();
     try{
-      let guard=0;
-      while(storyBuf(lesenTopic).length<3 && guard++<3){
-        const s=await makeStory(lesenTopic);
-        if(!s) break;
-        storyBuf(lesenTopic).push(s); save(); updateLesenStatus();
+      // current category first, then top every category up to 3 (persists on device)
+      const topics=[lesenTopic].concat(allLesenTopics().filter(t=>t!==lesenTopic));
+      for(const topic of topics){
+        let guard=0;
+        while(storyBuf(topic).length<3 && guard++<3){
+          const s=await makeStory(topic);
+          if(!s) break;
+          storyBuf(topic).push(s); save();
+          if(topic===lesenTopic) updateLesenStatus();
+        }
       }
     } finally { storyFilling=false; updateLesenStatus(); }
   }
@@ -1809,38 +1825,20 @@
   document.querySelectorAll("#verbTypes .chip").forEach(c=>c.onclick=()=>{ c.setAttribute("aria-pressed", c.getAttribute("aria-pressed")==="true"?"false":"true"); });
 
   /* --- infinitive learning --- */
+  // Infinitive learning = real SRS on verb cards (uses the normal study screen with
+  // Nochmal/Schwer/Gut/Einfach + intervals). Due verb cards also resurface in the daily lesson.
   $("#verbInfStart").onclick=startVerbInf;
   function startVerbInf(){
-    const list = verbInfCount==="all" ? (window.VERBLIST||[]).slice() : (window.VERBLIST||[]).slice(0,verbInfCount);
-    const kn=state.verbKnown||{};
-    const queue=shuffle(list.filter(v=>!kn[v[0]])).concat(shuffle(list.filter(v=>kn[v[0]])));
-    if(!queue.length){ toast("Keine Verben verfügbar"); return; }
-    verbSess={mode:"inf", queue, i:0, total:0, right:0, revealed:false};
-    showVerbView("verbPlay"); $("#verbGlyph").textContent="📖"; $("#verbLabel").textContent="Infinitive lernen";
+    const limit = verbInfCount==="all" ? CORE_VERB_COUNT : Math.min(verbInfCount, CORE_VERB_COUNT);
+    const pool = DECK.filter(w=>w.type==="verb" && w.verbIdx<limit);
+    const t=now();
+    const due = pool.filter(w=>state.cards[w.id] && state.cards[w.id].due<=t).map(w=>w.id);
+    const neu = pool.filter(w=>!state.cards[w.id]).slice(0, Math.max(10, state.settings.newPer)).map(w=>w.id);
+    const queue = due.concat(neu);
+    if(!queue.length){ toast("Alle Verben dieser Auswahl sitzen gerade — super!"); return; }
+    sess={queue, planned:queue.length, done:0, right:0, total:0, newLearned:new Set()};
     if("speechSynthesis" in window){ try{speechSynthesis.resume();}catch(e){} }
-    nextVerbInf();
-  }
-  function nextVerbInf(){
-    if(verbSess.i>=verbSess.queue.length){ verbSess.i=0; verbSess.queue=shuffle(verbSess.queue); }
-    verbSess.revealed=false;
-    const v=verbSess.queue[verbSess.i]; verbSess.current=v;
-    $("#verbRank").textContent="#"+(verbSess.total+1);
-    const badge=v[2]?"regelmäßig":"unregelmäßig";
-    $("#verbBody").innerHTML=`<div class="prompt-word">${esc(v[0])}</div><div class="pos">${badge}</div><div class="prompt-sub">Was heißt dieses Verb?</div>`;
-    $("#verbActions").innerHTML=`<button class="flip" id="verbFlip">Antwort zeigen</button>`;
-    $("#verbFlip").onclick=revealVerbInf; updateVerbCount();
-  }
-  function revealVerbInf(){
-    if(verbSess.revealed)return; verbSess.revealed=true; verbSess.total++;
-    const v=verbSess.current;
-    const rev=document.createElement("div"); rev.className="reveal";
-    rev.innerHTML=`<div class="answer-es"><span class="drill-a">${esc(v[1])}</span><button class="mini-audio" id="verbAudio" aria-label="Anhören">🔊</button></div>`;
-    $("#verbBody").appendChild(rev);
-    $("#verbAudio").onclick=()=>speak(v[0]); speak(v[0]);
-    $("#verbActions").innerHTML=`<div class="rate" style="grid-template-columns:1fr 1fr"><button class="again" id="verbNo"><span class="rl">Nochmal</span></button><button class="good" id="verbYes"><span class="rl">Gewusst</span></button></div>`;
-    $("#verbYes").onclick=()=>{ verbSess.right++; if(!state.verbKnown)state.verbKnown={}; state.verbKnown[v[0]]=true; save(); verbSess.i++; nextVerbInf(); };
-    $("#verbNo").onclick=()=>{ if(state.verbKnown) delete state.verbKnown[v[0]]; save(); verbSess.i++; nextVerbInf(); };
-    updateVerbCount();
+    gotoStudy(); nextCard();
   }
 
   /* --- conjugation --- */
@@ -1890,9 +1888,8 @@
   document.addEventListener("keydown",e=>{
     if($("#tab-verben").hidden || $("#verbPlay").hidden || !verbSess) return;
     if(e.key===" "||e.key==="Enter"){ e.preventDefault();
-      if(!verbSess.revealed){ (verbSess.mode==="inf"?revealVerbInf:revealVerbConj)(); }
-      else { verbSess.mode==="inf"? (verbSess.i++,nextVerbInf()) : nextVerbConj(); }
-    } else if(e.key==="ArrowRight"){ e.preventDefault(); if(verbSess.mode==="inf"){ verbSess.i++; nextVerbInf(); } else nextVerbConj(); }
+      if(!verbSess.revealed) revealVerbConj(); else nextVerbConj();
+    } else if(e.key==="ArrowRight"){ e.preventDefault(); nextVerbConj(); }
   });
 
   /* ---------- go ---------- */
