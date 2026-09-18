@@ -575,6 +575,7 @@
           <button class="chip" data-starter="image" aria-pressed="false"><span class="dot"></span>🖼 Bild beschreiben</button>
           <button class="chip" data-starter="text" aria-pressed="false"><span class="dot"></span>📝 Text / Frage</button>
           <button class="chip" data-starter="situation" aria-pressed="false"><span class="dot"></span>🎭 Situation</button>
+          <button class="chip" data-starter="monolog" aria-pressed="false"><span class="dot"></span>🚶 Monolog</button>
           <button class="chip" data-starter="flirt" aria-pressed="false"><span class="dot"></span>💘 Flirten</button>
           <button class="chip" data-starter="jokes" aria-pressed="false"><span class="dot"></span>😄 Witze</button>
           <button class="chip" data-starter="free" aria-pressed="false"><span class="dot"></span>💬 Freies Gespräch</button>
@@ -1123,6 +1124,18 @@
   function setState(s,txt){ talkState=s; const orb=$("#orb"); if(orb) orb.className="orb "+(s==="idle"?"":s); const st=$("#statusTxt"); if(st)st.textContent=txt||""; }
 
   function buildSystem(){
+    if(starterType==="monolog"){
+      return [
+        "Eres Lucía, una coach de español amable y relajada. La persona hace un MONÓLOGO hablado en español (por ejemplo mientras pasea): describe lo que ve, lo que hace, lo que piensa.",
+        "Nivel aproximado del usuario: "+(state.level||"A2")+".",
+        "Reglas:",
+        "- NO tomes el control ni lo conviertas en un diálogo largo. Deja que hable. Responde MUY breve (una frase): anímala a seguir (por ejemplo «¡sigue así!» o «¿y qué más ves?») o comenta algo mínimo.",
+        "- Si comete un error que impide entender, reformula la idea correcta de forma natural, sin cortar el flujo.",
+        "- Cuando no sepa una palabra (te la diga en alemán, pregunte cómo se dice, o diga que no la sabe), dale la palabra o expresión en español con naturalidad.",
+        "- MUY IMPORTANTE: cada vez que le enseñes una palabra o expresión nueva que no sabía, añade AL FINAL de tu mensaje, en su propia línea, el formato EXACTO: [[palabra en español :: Bedeutung auf Deutsch]] — una línea por palabra, varias si hace falta. Esa línea es una señal técnica para la app; no la menciones ni la comentes.",
+        "- Responde SOLO en español; sin listas, sin emojis."
+      ].join("\n");
+    }
     return [
       "Eres Lucía, una española de unos 30 años, cálida y natural. Tienes una conversación HABLADA con la persona usuaria, que aprende español y quiere practicar hablar con fluidez.",
       "Nivel aproximado del usuario: "+(state.level||"A2")+". Ajusta tu español a ese nivel.",
@@ -1163,6 +1176,9 @@
     if(starterType==="jokes"){
       return base+" Cuéntame un chiste corto y sencillo en español, adecuado al nivel "+lvl+" (humor amable, nada ofensivo). Después pregúntame si lo he entendido o si quiero otro, y si hace falta explícalo con naturalidad. Mantén un tono alegre.";
     }
+    if(starterType==="monolog"){
+      return base+" Voy a hacer un monólogo (por ejemplo mientras paseo): describiré en español lo que veo y hago. Salúdame en una sola frase y anímame a empezar. No hagas preguntas largas ni tomes el control.";
+    }
     if(starterType==="free"){
       return base+" Saluda de forma natural y haz una pregunta sencilla para romper el hielo.";
     }
@@ -1190,6 +1206,14 @@
     botReply(true);
   }
 
+  // In the monologue mode Lucía tags newly taught words as [[español :: deutsch]].
+  // Parse them out, add to the deck, and strip them from what we show/speak.
+  function extractNewWords(text){
+    const words=[], re=/\[\[\s*([^\]|:]+?)\s*::\s*([^\]]+?)\s*\]\]/g; let m;
+    while((m=re.exec(text))){ const es=m[1].trim(), de=m[2].trim(); if(es) words.push({es,de}); }
+    const clean=text.replace(re,"").replace(/[ \t]+\n/g,"\n").replace(/\n{2,}/g,"\n").trim();
+    return {clean, words};
+  }
   async function botReply(isOpen){
     setState("thinking","Lucía denkt nach…");
     const input=[];
@@ -1203,6 +1227,9 @@
     try{ const r=await apiClaude(input,{model:MODEL_CHAT,max_tokens:400}); text=((r&&r.text)||"").trim(); }
     catch(e){ setState("idle","Verbindungsproblem — starte das Gespräch neu (oder tippe unten)."); return; }
     if(!text) text="Perdona, ¿puedes repetir?";
+    const nw=extractNewWords(text);
+    if(nw.words.length){ const n=addVocabToDeck(nw.words); if(n){ toast(n+" Wort"+(n>1?"e":"")+" ins Deck ✓"); renderHome(); } }
+    text = nw.clean || text;
     addMsg("bot",text); convo.push({role:"bot",text}); save();
     speakThenListen(text);
   }
