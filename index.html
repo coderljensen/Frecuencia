@@ -1879,7 +1879,15 @@
     if(tense==="imp"){ const e = grp==="ar"? ["aba","abas","aba","ábamos","abais","aban"] : ["ía","ías","ía","íamos","íais","ían"]; return stem+e[pi]; }
     const e=["é","ás","á","emos","éis","án"]; return inf+e[pi];
   }
+  const REFL_PRON=["me","te","se","nos","os","se"];
   function conjOf(v,tense,pi){
+    // reflexive verbs (quedarse, levantarse …): strip -se, conjugate the base,
+    // and prepend the reflexive pronoun for that person → "os quedáis", "me he quedado".
+    const inf=v.inf||"";
+    if(/(ar|er|ir)se$/.test(inf)){
+      const base={inf:inf.slice(0,-2), grp:v.grp||inf.slice(-4,-2), de:v.de};
+      return (REFL_PRON[pi]||"")+" "+conjOf(base,tense,pi);
+    }
     if(tense==="perf"){ return (window.HABER_PRES||[])[pi]+" "+participio(v); }
     if(tense==="cont"){ const est=((window.VERBCONJ||{}).estar||{}).pres||["estoy","estás","está","estamos","estáis","están"]; return est[pi]+" "+gerundio(v); }
     const T=(window.VERBCONJ||{})[v.inf]; if(T && T[tense]) return T[tense][pi];
