@@ -216,6 +216,10 @@
   .hbtn.send{background:var(--accent);color:#fff;border-color:var(--accent)}
   .hbtn.mic.on{background:var(--again);color:#fff;border-color:var(--again)}
   .hbtn:disabled{opacity:.5;cursor:default}
+  .undofab{position:fixed;left:16px;bottom:18px;width:46px;height:46px;border-radius:14px;border:1px solid var(--line-strong);
+    background:var(--surface);color:var(--ink-soft);box-shadow:var(--shadow);cursor:pointer;z-index:55;
+    display:flex;align-items:center;justify-content:center;font-size:21px;transition:transform .15s ease}
+  .undofab:hover{transform:translateY(-2px);color:var(--ink)}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);
     padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:40;box-shadow:var(--shadow-lift)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -694,6 +698,9 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- undo / go back to the previous flashcard (only during study) -->
+<button class="undofab" id="undoFab" type="button" hidden aria-label="Zurück zur letzten Karte" title="Zurück zur letzten Karte">←</button>
+
 <!-- floating Spanish help chat -->
 <button class="helpfab" id="helpFab" type="button" aria-label="Spanisch-Hilfe öffnen"><span class="qm">?</span></button>
 <div class="helppanel" id="helpPanel" hidden>
@@ -935,6 +942,7 @@
     sess.current=w; sess.revealed=false; sess.mode=chooseMode(w);
     renderCard();
     updateSessBar();
+    updateUndoBtn();
   }
 
   function updateSessBar(){
@@ -1070,19 +1078,40 @@
     if(!sess.revealed)return;
     const w=sess.current;
     const before=rec(w.id);
+    if(!sess.history) sess.history=[];
+    const snap={ id:w.id, card:w, mode:sess.mode, grade, prevRec: before?JSON.parse(JSON.stringify(before)):null, addedNew:false, requeued:false };
     const {wasNew}=schedule(w.id,grade,true);
     sess.total++; if(grade>=3)sess.right++;
-    if(wasNew && !before) sess.newLearned.add(w.id);
+    if(wasNew && !before){ sess.newLearned.add(w.id); snap.addedNew=true; }
     sess.done++;
     save();
     // requeue if still learning and due soon (within session horizon)
     const c=rec(w.id);
     if(c.phase==="learning" && (c.due-now())<12*MIN){
       const pos=Math.min(sess.queue.length, 3+Math.floor(Math.random()*3));
-      sess.queue.splice(pos,0,w.id);
+      sess.queue.splice(pos,0,w.id); snap.requeued=true;
     }
+    sess.history.push(snap); if(sess.history.length>40) sess.history.shift();
     nextCard();
   }
+
+  // Go back one card: undo the last rating (e.g. a misclick) and re-show it to re-rate.
+  function undoCard(){
+    if(!sess || !sess.history || !sess.history.length) return;
+    const snap=sess.history.pop();
+    if(sess.current) sess.queue.unshift(sess.current.id);      // the card now on screen wasn't answered → keep it next
+    if(snap.requeued){ const i=sess.queue.indexOf(snap.id); if(i>=0) sess.queue.splice(i,1); }  // drop its requeued copy
+    if(snap.prevRec) state.cards[snap.id]=snap.prevRec; else delete state.cards[snap.id];        // restore SRS record
+    sess.total=Math.max(0,sess.total-1);
+    if(snap.grade>=3) sess.right=Math.max(0,sess.right-1);
+    sess.done=Math.max(0,sess.done-1);
+    if(snap.addedNew) sess.newLearned.delete(snap.id);
+    save();
+    sess.current=snap.card; sess.mode=snap.mode; sess.revealed=false;
+    renderCard(); revealCard();                                 // show the card again with its answer + rating buttons
+    updateSessBar(); updateUndoBtn();
+  }
+  function updateUndoBtn(){ const b=$("#undoFab"); if(!b) return; b.hidden = !(sess && sess.history && sess.history.length>0 && !$("#study").hidden); }
 
   function finishSession(){
     // streak update
@@ -1107,6 +1136,7 @@
   /* ---------- keyboard ---------- */
   document.addEventListener("keydown",e=>{
     if($("#study").hidden) return;
+    if(e.key==="ArrowLeft"){ e.preventDefault(); undoCard(); return; }
     if(e.key===" "||e.key==="Enter"){ e.preventDefault(); if(!sess.revealed) revealCard(); else answer(3); }
     else if(!sess.revealed) return;
     else if(e.key>="1"&&e.key<="4"){ e.preventDefault(); answer(+e.key); }
@@ -1114,7 +1144,8 @@
   });
 
   /* ---------- navigation ---------- */
-  function show(screen){ ["home","study","done"].forEach(s=>$("#"+s).hidden=(s!==screen)); if(screen==="home")renderHome(); window.scrollTo(0,0); }
+  function show(screen){ ["home","study","done"].forEach(s=>$("#"+s).hidden=(s!==screen)); if(screen==="home")renderHome(); updateUndoBtn(); window.scrollTo(0,0); }
+  $("#undoFab").onclick=undoCard;
   $("#startBtn").onclick=()=>startSession(false);
   $("#reviewBtn").onclick=()=>startSession(true);
   $("#quitBtn").onclick=()=>{ if(sess && sess.done>0){} sess=null; show("home"); };
@@ -1928,13 +1959,15 @@
   function cmMatch(m,inf,tense,pi){ return m.inf===inf && m.tense===tense && m.pi===pi; }
   function addConjMistake(inf,tense,pi){ if(!state.conjMistakes)state.conjMistakes=[]; if(!state.conjMistakes.some(m=>cmMatch(m,inf,tense,pi))){ state.conjMistakes.push({inf,tense,pi}); save(); } }
   function removeConjMistake(inf,tense,pi){ if(!state.conjMistakes)return; const b=state.conjMistakes.length; state.conjMistakes=state.conjMistakes.filter(m=>!cmMatch(m,inf,tense,pi)); if(state.conjMistakes.length!==b) save(); }
-  /* mastery: which (verb·tense·person) forms you already answered "Gewusst" → shown far less often */
+  /* mastery: how often you answered each (verb·tense·person) form "Gewusst" (0,1,2).
+     A form counts as MASTERED after 2 correct answers → then it's shown far less often. */
   function ckKey(inf,tense,pi){ return inf+"|"+tense+"|"+pi; }
-  function markConjKnown(inf,tense,pi){ if(!state.conjKnown)state.conjKnown={}; if(!state.conjKnown[ckKey(inf,tense,pi)]){ state.conjKnown[ckKey(inf,tense,pi)]=1; save(); } }
-  function unmarkConjKnown(inf,tense,pi){ if(!state.conjKnown)return; if(state.conjKnown[ckKey(inf,tense,pi)]){ delete state.conjKnown[ckKey(inf,tense,pi)]; save(); } }
-  function isConjKnown(inf,tense,pi){ return !!(state.conjKnown && state.conjKnown[ckKey(inf,tense,pi)]); }
-  // count of the verb's forms (over the currently drilled tenses) that are NOT yet known
-  function verbUnknownCount(inf,tenses){ let n=0; for(const t of tenses){ for(let pi=0;pi<6;pi++){ if(!isConjKnown(inf,t,pi)) n++; } } return n; }
+  function conjLevel(inf,tense,pi){ return (state.conjKnown && state.conjKnown[ckKey(inf,tense,pi)]) || 0; }
+  function markConjKnown(inf,tense,pi){ if(!state.conjKnown)state.conjKnown={}; const k=ckKey(inf,tense,pi); state.conjKnown[k]=Math.min(2,(state.conjKnown[k]||0)+1); save(); }
+  function unmarkConjKnown(inf,tense,pi){ if(!state.conjKnown)return; const k=ckKey(inf,tense,pi); if(state.conjKnown[k]){ delete state.conjKnown[k]; save(); } }  // wrong → back to unknown
+  function isConjKnown(inf,tense,pi){ return conjLevel(inf,tense,pi)>=2; }
+  // how many more "Gewusst" the verb still needs across the drilled tenses (2 per unmastered form)
+  function verbUnknownCount(inf,tenses){ let n=0; for(const t of tenses){ for(let pi=0;pi<6;pi++){ n+=Math.max(0,2-conjLevel(inf,t,pi)); } } return n; }
   function verbFromInf(inf){ const v=(window.VERBLIST||[]).find(x=>x[0]===inf); return v?{inf:v[0],de:v[1],grp:v[3],reg:v[2]}:{inf,de:"",grp:"ar",reg:true}; }
   function startVerbMistakes(){
     const list=(state.conjMistakes||[]);
@@ -2004,10 +2037,11 @@
       let r=Math.random()*sum, idx=0;
       for(let i=0;i<verbSess.pool.length;i++){ r-=weights[i]; if(r<=0){ idx=i; break; } idx=i; }
       v=verbSess.pool[idx];
-      // within the verb, prefer a form (tense·person) you don't know yet
-      const unknown=[];
-      for(const t of ts){ for(let p=0;p<6;p++){ if(!isConjKnown(v.inf,t,p)) unknown.push([t,p]); } }
-      if(unknown.length){ const pick=unknown[Math.floor(Math.random()*unknown.length)]; tense=pick[0]; pi=pick[1]; }
+      // within the verb, prefer the least-known forms (level 0 before level 1), weighted by how much they still need
+      const forms=[];
+      for(const t of ts){ for(let p=0;p<6;p++){ const need=2-conjLevel(v.inf,t,p); if(need>0) forms.push([t,p,need]); } }
+      if(forms.length){ let fs=forms.reduce((a,f)=>a+f[2],0), fr=Math.random()*fs, fp=forms[0];
+        for(const f of forms){ fr-=f[2]; if(fr<=0){ fp=f; break; } fp=f; } tense=fp[0]; pi=fp[1]; }
       else { tense=ts[Math.floor(Math.random()*ts.length)]; pi=Math.floor(Math.random()*6); }
     }
     const P=window.VERB_PERSONS;
