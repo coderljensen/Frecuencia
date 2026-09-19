@@ -1786,7 +1786,8 @@
       prompt=[
         "Cuenta en español, de forma sencilla y fiel, un pasaje conocido de la Biblia para un aprendiz de nivel "+lvl+": "+pas+".",
         "4-7 frases en un español claro adaptado a ese nivel. No copies una traducción concreta: cuéntalo con tus propias palabras respetando el contenido.",
-        'Devuelve SOLO un objeto JSON: {"titulo":"nombre del pasaje","texto":"el pasaje completo","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
+        'Devuelve SOLO un objeto JSON: {"titulo":"nombre del pasaje seguido del libro (y capítulo si lo sabes) entre paréntesis, p. ej. «El hijo pródigo (Lucas 15)» o «La Creación (Génesis 1)»","texto":"el pasaje completo","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
+        "El título SIEMPRE debe terminar con el libro de la Biblia entre paréntesis para poder ubicar el pasaje.",
         "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana."
       ].join("\n");
     } else {

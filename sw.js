@@ -1,4 +1,4 @@
-const CACHE = "frecuencia-v20";
+const CACHE = "frecuencia-v21";
 const ASSETS = [
   "./", "index.html",
   "words.js", "words2.js", "words3.js", "words4.js", "words5.js", "words6.js", "words7.js", "words8.js",
