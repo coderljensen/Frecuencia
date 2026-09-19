@@ -191,6 +191,31 @@
   .done .grid .l{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint)}
 
   footer.foot{text-align:center;font-size:12px;color:var(--ink-faint);margin-top:auto;padding-top:10px}
+  /* floating help chat (Spain flag) */
+  .helpfab{position:fixed;right:16px;bottom:18px;width:54px;height:54px;border-radius:16px;border:1px solid var(--line-strong);
+    background:linear-gradient(to bottom,#AA151B 0 25%,#F1BF00 25% 75%,#AA151B 75% 100%);box-shadow:var(--shadow-lift);
+    cursor:pointer;z-index:60;display:flex;align-items:center;justify-content:center;transition:transform .15s ease}
+  .helpfab:hover{transform:translateY(-2px)}
+  .helpfab .qm{font-family:var(--serif);font-weight:700;font-size:25px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);line-height:1}
+  .helppanel{position:fixed;right:16px;bottom:82px;z-index:60;width:min(372px,calc(100vw - 32px));max-height:min(64vh,560px);
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius);box-shadow:var(--shadow-lift);
+    display:flex;flex-direction:column;overflow:hidden}
+  .helppanel .hhead{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+  .helppanel .hhead .ht{font-family:var(--serif);font-weight:600;font-size:15px}
+  .helppanel .hhead .hs{font-size:11.5px;color:var(--ink-faint)}
+  .helpbody{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px}
+  .hmsg{max-width:86%;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+  .hmsg.me{align-self:flex-end;background:var(--accent-soft);color:var(--accent-ink);border-bottom-right-radius:5px}
+  .hmsg.bot{align-self:flex-start;background:var(--raised);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .hmsg.tip{align-self:stretch;color:var(--ink-faint);font-size:12.5px;background:none;text-align:center;padding:4px 6px;max-width:100%}
+  .hinput{display:flex;align-items:flex-end;gap:7px;padding:10px;border-top:1px solid var(--line);background:var(--surface)}
+  .hinput textarea{flex:1;resize:none;border:1px solid var(--line-strong);border-radius:12px;padding:9px 11px;font-family:var(--sans);
+    font-size:14px;background:var(--raised);color:var(--ink);max-height:96px;min-height:40px;line-height:1.4}
+  .hbtn{flex:0 0 auto;width:40px;height:40px;border-radius:11px;border:1px solid var(--line-strong);background:var(--raised);
+    color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .hbtn.send{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .hbtn.mic.on{background:var(--again);color:#fff;border-color:var(--again)}
+  .hbtn:disabled{opacity:.5;cursor:default}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);
     padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:40;box-shadow:var(--shadow-lift)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -493,6 +518,8 @@
         <button class="chip" data-t="la comida"><span class="dot"></span>Essen</button>
         <button class="chip" data-t="una anécdota divertida"><span class="dot"></span>Lustiges</button>
         <button class="chip" data-t="misterio corto"><span class="dot"></span>Mini-Krimi</button>
+        <button class="chip" data-t="historia de España"><span class="dot"></span>Geschichte</button>
+        <button class="chip" data-t="pasaje de la Biblia"><span class="dot"></span>Bibel</button>
       </div>
       <button class="cta" id="lesenBtn">Neue Geschichte</button>
       <p class="micnote" id="lesenNote"></p>
@@ -666,6 +693,18 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- floating Spanish help chat -->
+<button class="helpfab" id="helpFab" type="button" aria-label="Spanisch-Hilfe öffnen"><span class="qm">?</span></button>
+<div class="helppanel" id="helpPanel" hidden>
+  <div class="hhead"><div style="flex:1"><div class="ht">Frag auf Spanisch 🇪🇸</div><div class="hs">Wörter · Grammatik · Präpositionen</div></div></div>
+  <div class="helpbody" id="helpBody"></div>
+  <div class="hinput">
+    <textarea id="helpText" rows="1" placeholder="Was heißt …? Warum benutzt man …?"></textarea>
+    <button class="hbtn mic" id="helpMic" type="button" title="Sprechen" aria-label="Frage sprechen">🎙</button>
+    <button class="hbtn send" id="helpSend" type="button" title="Senden" aria-label="Senden">➤</button>
+  </div>
+</div>
 
 <script src="words.js"></script>
 <script src="words2.js"></script>
@@ -1724,16 +1763,40 @@
     const n=storyBuf(lesenTopic).length; const note=$("#lesenNote"); note.className="micnote";
     note.textContent = n>0 ? (n+" Geschichte"+(n>1?"n":"")+" bereit"+(storyFilling?" · Nachschub läuft…":"")) : (storyFilling?"Erste Geschichte wird vorbereitet…":"");
   }
+  const STORY_KIND={"historia de España":"hist","pasaje de la Biblia":"bible"};
+  const HIST_THEMES=["Al-Ándalus y la España musulmana","la Reconquista","los Reyes Católicos (Isabel y Fernando)","el descubrimiento de América en 1492","Cristóbal Colón","el Siglo de Oro español","la Armada Invencible","los romanos en Hispania","un rey o una reina de España","una ciudad histórica española (Toledo, Sevilla o Granada)","el Camino de Santiago","la Transición a la democracia","un invento o descubrimiento de España","los pueblos antiguos de Iberia (íberos y celtas)","un gran pintor español (Velázquez, Goya o Picasso)","la Alhambra de Granada","el flamenco y su origen","la Guerra Civil española (de forma breve y neutral)"];
+  const BIBLE_PASSAGES=["la Creación (Génesis 1)","Adán y Eva en el jardín","Noé y el arca","Moisés y el Mar Rojo","los Diez Mandamientos","David y Goliat","el Salmo 23 (El Señor es mi pastor)","Daniel en el foso de los leones","Jonás y el gran pez","el nacimiento de Jesús","el buen samaritano","el hijo pródigo","Jesús calma la tormenta","la última cena","el Padre Nuestro","la multiplicación de los panes","la oveja perdida"];
+  const pickOne=(a)=>a[Math.floor(Math.random()*a.length)];
   async function makeStory(topic){
     const lvl=state.level||"A2";
+    const kind=STORY_KIND[topic];
+    let prompt;
+    if(kind==="hist"){
+      const tema=pickOne(HIST_THEMES);
+      prompt=[
+        "Escribe un texto informativo MUY corto en español para un aprendiz de nivel "+lvl+" sobre un hecho o tema REAL de la historia de España: "+tema+".",
+        "5-8 frases, claras y precisas, con vocabulario y gramática adecuados a ese nivel. Debe ser verídico e interesante, como un pequeño artículo.",
+        'Devuelve SOLO un objeto JSON: {"titulo":"el tema","texto":"el texto completo","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
+        "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana."
+      ].join("\n");
+    } else if(kind==="bible"){
+      const pas=pickOne(BIBLE_PASSAGES);
+      prompt=[
+        "Cuenta en español, de forma sencilla y fiel, un pasaje conocido de la Biblia para un aprendiz de nivel "+lvl+": "+pas+".",
+        "4-7 frases en un español claro adaptado a ese nivel. No copies una traducción concreta: cuéntalo con tus propias palabras respetando el contenido.",
+        'Devuelve SOLO un objeto JSON: {"titulo":"nombre del pasaje","texto":"el pasaje completo","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
+        "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana."
+      ].join("\n");
+    } else {
     const withDialog=Math.random()<0.45;
-    const prompt=[
+    prompt=[
       "Escribe una historia MUY corta en español para un aprendiz de nivel "+lvl+" sobre: "+topic+".",
       "5-8 frases, vocabulario y gramática adecuados a ese nivel, natural y entretenida.",
       withDialog ? "Incluye DIÁLOGO entre dos personas (usa guiones — para las intervenciones), no solo narración." : "Escríbela como una narración breve.",
       'Devuelve SOLO un objeto JSON: {"titulo":"...","texto":"la historia completa","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
       "En glosario incluye 6-10 palabras o expresiones útiles que aparecen en el texto, con su traducción alemana."
     ].join("\n");
+    }
     for(let attempt=0; attempt<2; attempt++){
       try{ const r=await apiClaude([{role:"user",content:prompt}],{model:MODEL_CHAT,max_tokens:1100,json:true}); const d=parseJSON(r.text); if(d&&d.texto) return d; }
       catch(e){}
@@ -1954,6 +2017,71 @@
       if(!verbSess.revealed) revealVerbConj(); else nextVerbConj();
     } else if(e.key==="ArrowRight"){ e.preventDefault(); nextVerbConj(); }
   });
+
+  /* ---------- floating Spanish help chat (Spain flag) ---------- */
+  (function(){
+    const fab=$("#helpFab"), panel=$("#helpPanel"), body=$("#helpBody"),
+          input=$("#helpText"), micBtn=$("#helpMic"), sendBtn=$("#helpSend");
+    if(!fab) return;
+    let isOpen=false, busy=false, hrecog=null, listening=false, startVal="";
+    const history=[];   // {role:"user"|"bot", text} — lives only while the panel is open
+
+    function addMsg(who, text){
+      const d=document.createElement("div");
+      d.className="hmsg "+who; d.textContent=text;
+      body.appendChild(d); body.scrollTop=body.scrollHeight; return d;
+    }
+    function autoSize(){ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,96)+"px"; }
+    function greet(){
+      if(body.children.length) return;
+      addMsg("tip","Frag mich auf Deutsch — was ein Wort heißt, wie man etwas sagt, oder eine Grammatikregel. Schreib oder sprich (Mikro) und dann auf Senden.");
+    }
+    function openPanel(){ isOpen=true; panel.hidden=false; greet(); setTimeout(()=>{ try{input.focus();}catch(e){} },60); }
+    function closePanel(){ isOpen=false; panel.hidden=true; stopListen(); body.innerHTML=""; history.length=0; input.value=""; autoSize(); }
+    fab.onclick=()=>{ isOpen?closePanel():openPanel(); };
+
+    input.addEventListener("input",autoSize);
+    input.addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); doSend(); } });
+
+    async function doSend(){
+      const q=input.value.trim(); if(!q||busy) return;
+      addMsg("me",q);
+      input.value=""; autoSize();
+      busy=true; sendBtn.disabled=true;
+      const bubble=addMsg("bot","…");
+      try{
+        const sys=[
+          "Eres un tutor de español para un estudiante ALEMÁN. El estudiante pregunta EN ALEMÁN sobre el español: qué significa una palabra, cómo se dice algo, gramática, preposiciones, conjugación o ejemplos.",
+          "Responde SIEMPRE en alemán, breve y claro (2 a 6 frases). Cuando ayude, da ejemplos en español con su traducción alemana. Ve al grano, sin rodeos.",
+          "Si la pregunta no tiene nada que ver con aprender español, di amablemente en alemán que solo ayudas con el español."
+        ].join(" ");
+        const prior=history.slice(-6).map(m=>(m.role==="user"?"Estudiante: ":"Tutor: ")+m.text).join("\n");
+        const content=sys+(prior?("\n\nContexto de la conversación:\n"+prior):"")+"\n\nNueva pregunta (responde en alemán): "+q;
+        history.push({role:"user",text:q});
+        const r=await apiClaude([{role:"user",content}],{model:MODEL_CHAT,max_tokens:500});
+        const ans=((r&&r.text)||"").trim()||"Hmm, dazu habe ich gerade keine Antwort.";
+        bubble.textContent=ans; history.push({role:"bot",text:ans});
+      }catch(e){
+        bubble.textContent="Verbindungsproblem — bitte gleich nochmal versuchen.";
+      }finally{ busy=false; sendBtn.disabled=false; body.scrollTop=body.scrollHeight; }
+    }
+    sendBtn.onclick=doSend;
+
+    function stopListen(){ if(hrecog){ try{hrecog.stop();}catch(e){} hrecog=null; } listening=false; micBtn.classList.remove("on"); }
+    micBtn.onclick=()=>{
+      if(!SR){ toast("Spracheingabe ist auf diesem Gerät nicht verfügbar"); return; }
+      if(listening){ stopListen(); return; }
+      try{
+        startVal=input.value.trim();
+        hrecog=new SR(); hrecog.lang="de-DE"; hrecog.interimResults=true; hrecog.continuous=false; hrecog.maxAlternatives=1;
+        hrecog.onresult=(e)=>{ let t=""; for(let i=e.resultIndex;i<e.results.length;i++){ t+=e.results[i][0].transcript; }
+          input.value=(startVal?startVal+" ":"")+t; autoSize(); };
+        hrecog.onerror=()=>{ stopListen(); };
+        hrecog.onend=()=>{ listening=false; micBtn.classList.remove("on"); };
+        listening=true; micBtn.classList.add("on"); hrecog.start();
+      }catch(e){ stopListen(); toast("Mikrofon nicht verfügbar"); }
+    };
+  })();
 
   /* ---------- go ---------- */
   $("#deckcount").textContent = DECK.length;

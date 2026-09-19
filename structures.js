@@ -153,7 +153,13 @@ window.STRUCTURES = [
       ["Sie ist noch nicht angekommen.","Todavía no ha llegado."],
       ["Ich habe das nie gemacht.","Nunca lo he hecho."],
       ["Habt ihr die Nachricht gelesen?","¿Habéis leído el mensaje?"],
-      ["Diese Woche habe ich viel gelernt.","Esta semana he estudiado mucho."]
+      ["Diese Woche habe ich viel gelernt.","Esta semana he estudiado mucho."],
+      ["Ich habe heute noch nicht gefrühstückt.","Hoy todavía no he desayunado."],
+      ["Warst du schon mal in Spanien?","¿Has estado alguna vez en España?"],
+      ["Wir sind schon angekommen.","Ya hemos llegado."],
+      ["Sie haben mir nichts gesagt.","No me han dicho nada."],
+      ["Ich habe meine Hausaufgaben gemacht.","He hecho los deberes."],
+      ["Dieses Jahr sind wir viel gereist.","Este año hemos viajado mucho."]
     ]
   },
   {
@@ -167,7 +173,13 @@ window.STRUCTURES = [
       ["Ich bin früh aufgestanden.","Me levanté temprano."],
       ["Was ist gestern passiert?","¿Qué pasó ayer?"],
       ["Sie kauften ein Haus.","Compraron una casa."],
-      ["Ich habe den Film gestern Abend gesehen.","Vi la película anoche."]
+      ["Ich habe den Film gestern Abend gesehen.","Vi la película anoche."],
+      ["Kolumbus kam 1492 in Amerika an.","Colón llegó a América en 1492."],
+      ["Ich wurde in Berlin geboren.","Nací en Berlín."],
+      ["Sie gingen ins Kino.","Fueron al cine."],
+      ["Wir hatten eine tolle Zeit.","Lo pasamos genial."],
+      ["Er schrieb mir gestern.","Me escribió ayer."],
+      ["Ich konnte nicht schlafen.","No pude dormir."]
     ]
   },
   {
@@ -181,7 +193,13 @@ window.STRUCTURES = [
       ["Sie war sehr schön.","Ella era muy guapa."],
       ["Ich hatte einen Hund.","Tenía un perro."],
       ["Während er las, kochte ich.","Mientras él leía, yo cocinaba."],
-      ["Es war drei Uhr.","Eran las tres."]
+      ["Es war drei Uhr.","Eran las tres."],
+      ["Als ich klein war, aß ich viele Süßigkeiten.","Cuando era pequeño, comía muchos dulces."],
+      ["Es gab viele Leute auf der Straße.","Había mucha gente en la calle."],
+      ["Wir sahen jeden Tag fern.","Veíamos la tele todos los días."],
+      ["Ich dachte, du wärst zu Hause.","Pensaba que estabas en casa."],
+      ["Sie trug immer ein rotes Kleid.","Siempre llevaba un vestido rojo."],
+      ["Wie hieß dein erster Lehrer?","¿Cómo se llamaba tu primer profesor?"]
     ]
   },
   {
@@ -195,7 +213,13 @@ window.STRUCTURES = [
       ["Ich hoffe, dass es dir gefällt.","Espero que te guste."],
       ["Sie will, dass wir früh kommen.","Quiere que vengamos temprano."],
       ["Ich hoffe, dass es dir besser geht.","Espero que te sientas mejor."],
-      ["Vielleicht regnet es morgen.","Quizás llueva mañana."]
+      ["Vielleicht regnet es morgen.","Quizás llueva mañana."],
+      ["Ich hoffe, dass ihr euch amüsiert.","Espero que os divirtáis."],
+      ["Es ist besser, dass du früh schläfst.","Es mejor que duermas temprano."],
+      ["Ich will nicht, dass du gehst.","No quiero que te vayas."],
+      ["Ich hoffe, dass wir uns bald sehen.","Espero que nos veamos pronto."],
+      ["Es freut mich, dass du hier bist.","Me alegro de que estés aquí."],
+      ["Sie bittet mich, ihr zu helfen.","Me pide que la ayude."]
     ]
   },
   {
@@ -209,7 +233,13 @@ window.STRUCTURES = [
       ["Wenn ich Spanisch könnte, würde ich in Spanien arbeiten.","Si supiera español, trabajaría en España."],
       ["Was würdest du tun, wenn du gewinnen würdest?","¿Qué harías si ganaras?"],
       ["Wenn ich könnte, würde ich mehr schlafen.","Si pudiera, dormiría más."],
-      ["Wenn du kämst, wäre ich glücklich.","Si vinieras, sería feliz."]
+      ["Wenn du kämst, wäre ich glücklich.","Si vinieras, sería feliz."],
+      ["Wenn ich reich wäre, würde ich nicht arbeiten.","Si fuera rico, no trabajaría."],
+      ["Wenn wir mehr Zeit hätten, würden wir bleiben.","Si tuviéramos más tiempo, nos quedaríamos."],
+      ["Wenn du mehr lernen würdest, würdest du bestehen.","Si estudiaras más, aprobarías."],
+      ["Was würdest du sagen, wenn er käme?","¿Qué dirías si él viniera?"],
+      ["Wenn ich in Madrid wäre, würde ich dich besuchen.","Si estuviera en Madrid, te visitaría."],
+      ["Wenn es möglich wäre, würde ich es ändern.","Si fuera posible, lo cambiaría."]
     ]
   },
   {
@@ -251,7 +281,13 @@ window.STRUCTURES = [
       ["Ich zahle zwanzig Euro dafür.","Pago veinte euros por esto."],
       ["Der Zug fährt nach Madrid.","El tren sale para Madrid."],
       ["Wir treffen uns am Morgen.","Quedamos por la mañana."],
-      ["Ich brauche es für morgen.","Lo necesito para mañana."]
+      ["Ich brauche es für morgen.","Lo necesito para mañana."],
+      ["Dieses Geschenk ist für meine Mutter.","Este regalo es para mi madre."],
+      ["Wir haben lange telefoniert.","Hablamos por teléfono mucho rato."],
+      ["Ich mache das für dich.","Lo hago por ti."],
+      ["Um gesund zu sein, muss man schlafen.","Para estar sano, hay que dormir."],
+      ["Danke fürs Kommen.","Gracias por venir."],
+      ["Er lernt, um Arzt zu werden.","Estudia para ser médico."]
     ]
   },
   {
@@ -265,7 +301,13 @@ window.STRUCTURES = [
       ["Ich schreibe ihr.","Le escribo."],
       ["Kannst du mir helfen?","¿Puedes ayudarme?"],
       ["Ich liebe dich.","Te quiero."],
-      ["Sie erzählt es uns.","Nos lo cuenta."]
+      ["Sie erzählt es uns.","Nos lo cuenta."],
+      ["Ich kenne sie (fem.).","La conozco."],
+      ["Kannst du es mir geben?","¿Puedes dármelo?"],
+      ["Ich habe ihm die Wahrheit gesagt.","Le dije la verdad."],
+      ["Sie rufen uns morgen an.","Nos llaman mañana."],
+      ["Ich sehe euch später.","Os veo luego."],
+      ["Ich schicke es dir heute.","Te lo envío hoy."]
     ]
   },
   {
@@ -279,7 +321,13 @@ window.STRUCTURES = [
       ["Es wird morgen regnen.","Lloverá mañana."],
       ["Sie werden später kommen.","Vendrán más tarde."],
       ["Ich werde dich anrufen.","Te llamaré."],
-      ["Alles wird gut.","Todo irá bien."]
+      ["Alles wird gut.","Todo irá bien."],
+      ["Nächstes Jahr werde ich Spanisch sprechen.","El año que viene hablaré español."],
+      ["Wir werden zusammen essen.","Comeremos juntos."],
+      ["Was wirst du am Wochenende machen?","¿Qué harás el fin de semana?"],
+      ["Sie wird bald zurück sein.","Volverá pronto."],
+      ["Ich werde es dir morgen sagen.","Te lo diré mañana."],
+      ["Es wird sich lohnen.","Valdrá la pena."]
     ]
   },
   {
@@ -293,7 +341,13 @@ window.STRUCTURES = [
       ["Würdest du mit mir kommen?","¿Vendrías conmigo?"],
       ["Wir sollten mehr lernen.","Deberíamos estudiar más."],
       ["Ich würde lieber zu Hause bleiben.","Preferiría quedarme en casa."],
-      ["Das würde ich nie tun.","Eso nunca lo haría."]
+      ["Das würde ich nie tun.","Eso nunca lo haría."],
+      ["Ich würde gerne mit dir reisen.","Me gustaría viajar contigo."],
+      ["Würdest du mir einen Gefallen tun?","¿Me harías un favor?"],
+      ["Wir würden lieber Kaffee trinken.","Preferiríamos tomar café."],
+      ["Das würde viel Zeit kosten.","Eso costaría mucho tiempo."],
+      ["Könnten Sie das wiederholen?","¿Podría repetirlo?"],
+      ["Ich würde sagen, dass es gut ist.","Yo diría que está bien."]
     ]
   },
   {
