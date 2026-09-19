@@ -689,7 +689,7 @@
     <div id="evalResult"></div>
   </section>
 
-  <footer class="foot">Frecuencia · 2000+ Wörter &amp; Grammatik-Muster · Sprechen &amp; Auswertung mit Claude · lokal gespeichert<span id="deckcount" hidden></span></footer>
+  <footer class="foot" hidden><span id="deckcount"></span></footer>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -700,7 +700,7 @@
   <div class="hhead"><div style="flex:1"><div class="ht">Frag auf Spanisch 🇪🇸</div><div class="hs">Wörter · Grammatik · Präpositionen</div></div></div>
   <div class="helpbody" id="helpBody"></div>
   <div class="hinput">
-    <textarea id="helpText" rows="1" placeholder="Was heißt …? Warum benutzt man …?"></textarea>
+    <textarea id="helpText" rows="1" placeholder="Was heißt …?"></textarea>
     <button class="hbtn mic" id="helpMic" type="button" title="Sprechen" aria-label="Frage sprechen">🎙</button>
     <button class="hbtn send" id="helpSend" type="button" title="Senden" aria-label="Senden">➤</button>
   </div>
@@ -2032,11 +2032,7 @@
       body.appendChild(d); body.scrollTop=body.scrollHeight; return d;
     }
     function autoSize(){ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,96)+"px"; }
-    function greet(){
-      if(body.children.length) return;
-      addMsg("tip","Frag mich auf Deutsch — was ein Wort heißt, wie man etwas sagt, oder eine Grammatikregel. Schreib oder sprich (Mikro) und dann auf Senden.");
-    }
-    function openPanel(){ isOpen=true; panel.hidden=false; greet(); setTimeout(()=>{ try{input.focus();}catch(e){} },60); }
+    function openPanel(){ isOpen=true; panel.hidden=false; setTimeout(()=>{ try{input.focus();}catch(e){} },60); }
     function closePanel(){ isOpen=false; panel.hidden=true; stopListen(); body.innerHTML=""; history.length=0; input.value=""; autoSize(); }
     fab.onclick=()=>{ isOpen?closePanel():openPanel(); };
 
