@@ -220,6 +220,9 @@
     background:var(--surface);color:var(--ink-soft);box-shadow:var(--shadow);cursor:pointer;z-index:55;
     display:flex;align-items:center;justify-content:center;font-size:21px;transition:transform .15s ease}
   .undofab:hover{transform:translateY(-2px);color:var(--ink)}
+  .interstitial{text-align:center;padding:34px 16px}
+  .interstitial .ib-title{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:10px}
+  .interstitial .ib-sub{color:var(--ink-soft);font-size:15px;line-height:1.55}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);
     padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:40;box-shadow:var(--shadow-lift)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -895,15 +898,14 @@
     const t=now();
     const dueIds=DECK.filter(w=>!w.isVerb && state.cards[w.id] && state.cards[w.id].due<=t).map(w=>w.id);
     dueIds.sort((a,b)=>state.cards[a].due-state.cards[b].due);
-    let queue=dueIds.slice();
-    let planned=dueIds.length;
-    if(!onlyReview){
-      const newIds=pickNewCards(state.settings.newPer);
-      newIds.forEach((id,i)=>{ const pos=Math.min(queue.length, Math.round((i+1)*(queue.length+newIds.length)/(newIds.length+1))); queue.splice(pos,0,id); });
-      planned+=newIds.length;
-    }
-    if(!queue.length) return null;
-    return {queue, planned, done:0, right:0, total:0, newLearned:new Set()};
+    const pending = onlyReview ? [] : pickNewCards(state.settings.newPer);
+    if(!dueIds.length && !pending.length) return null;
+    // Fällige zuerst (exklusiv). Neue Karten werden zurückgehalten, bis alle Fälligen
+    // durch sind — dann kommt eine Zwischenmeldung, bevor die neuen starten.
+    let queue, pend;
+    if(dueIds.length){ queue=dueIds.slice(); pend=pending; }
+    else { queue=pending.slice(); pend=[]; }
+    return {queue, pending:pend, planned:queue.length, phaseStart:0, done:0, right:0, total:0, newLearned:new Set()};
   }
 
   let lessonMode=false;
@@ -936,7 +938,11 @@
   }
 
   function nextCard(){
-    if(!sess.queue.length){ return finishSession(); }
+    if(!sess.queue.length){
+      if(sess.pending && sess.pending.length) return showReviewDone();
+      return finishSession();
+    }
+    sess.interstitial=false;
     const id=sess.queue.shift();
     const w=DECK.find(x=>x.id===id);
     sess.current=w; sess.revealed=false; sess.mode=chooseMode(w);
@@ -946,10 +952,13 @@
   }
 
   function updateSessBar(){
-    const total=sess.done+sess.queue.length+1;
-    const pct=Math.round(sess.done/Math.max(1,total)*100);
+    const base=sess.phaseStart||0;
+    const dp=Math.max(0,sess.done-base);
+    if(sess.interstitial){ $("#sessbar").style.width="100%"; $("#sesscount").textContent=dp+" / "+dp; return; }
+    const total=dp+sess.queue.length+1;
+    const pct=Math.round(dp/Math.max(1,total)*100);
     $("#sessbar").style.width=pct+"%";
-    $("#sesscount").textContent=sess.done+" / "+Math.max(sess.planned,sess.done+sess.queue.length+1);
+    $("#sesscount").textContent=dp+" / "+Math.max((sess.planned-base)||total, dp+sess.queue.length+1);
   }
 
   const MODE_META={listen:{g:"🔊",l:"Hören → Verstehen"},read:{g:"👁",l:"Lesen → Verstehen"},produce:{g:"🗣",l:"Wiedergeben — sag es auf Spanisch"}};
@@ -1075,7 +1084,7 @@
   }
 
   function answer(grade){
-    if(!sess.revealed)return;
+    if(!sess.revealed || sess.interstitial)return;
     const w=sess.current;
     const before=rec(w.id);
     if(!sess.history) sess.history=[];
@@ -1111,7 +1120,25 @@
     renderCard(); revealCard();                                 // show the card again with its answer + rating buttons
     updateSessBar(); updateUndoBtn();
   }
-  function updateUndoBtn(){ const b=$("#undoFab"); if(!b) return; b.hidden = !(sess && sess.history && sess.history.length>0 && !$("#study").hidden); }
+  function updateUndoBtn(){ const b=$("#undoFab"); if(!b) return; b.hidden = !(sess && sess.history && sess.history.length>0 && !sess.interstitial && !$("#study").hidden); }
+
+  // Shown after all DUE cards are done, before the new cards of the daily lesson.
+  function showReviewDone(){
+    sess.interstitial=true; sess.revealed=true;
+    const n=sess.pending.length;
+    $("#modeGlyph").textContent="✅"; $("#modeLabel").textContent="Wiederholungen fertig";
+    $("#cardRank").textContent="";
+    $("#cardBody").innerHTML=`<div class="interstitial">
+      <div class="ib-title">Alle fälligen Karten fertig! 🎉</div>
+      <div class="ib-sub">${n} neue ${n===1?"Karte":"Karten"} warten in der heutigen Lektion.<br>Weiterlernen — oder für heute genug und die neuen ein andermal.</div>
+    </div>`;
+    $("#actions").innerHTML=`<button class="flip" id="contNew">Neue Wörter lernen (${n})</button>
+      <button class="cta ghost" id="stopHere" style="margin-top:9px">Für heute genug</button>`;
+    $("#kbdhint").innerHTML="";
+    updateSessBar(); updateUndoBtn();
+    $("#contNew").onclick=()=>{ sess.interstitial=false; sess.queue=sess.pending.slice(); sess.pending=[]; sess.phaseStart=sess.done; sess.planned=sess.done+sess.queue.length; sess.history=[]; nextCard(); };
+    $("#stopHere").onclick=()=>{ sess.pending=[]; sess.interstitial=false; finishSession(); };
+  }
 
   function finishSession(){
     // streak update
@@ -1136,6 +1163,7 @@
   /* ---------- keyboard ---------- */
   document.addEventListener("keydown",e=>{
     if($("#study").hidden) return;
+    if(sess && sess.interstitial) return;
     if(e.key==="ArrowLeft"){ e.preventDefault(); undoCard(); return; }
     if(e.key===" "||e.key==="Enter"){ e.preventDefault(); if(!sess.revealed) revealCard(); else answer(3); }
     else if(!sess.revealed) return;
