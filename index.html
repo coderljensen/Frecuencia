@@ -1614,7 +1614,9 @@
   }
   function showStructIntro(slug){
     const st=STRUCT_BY[slug]; if(!st){ startStructureSession(slug); return; }
-    const ex=st.cards.slice(0,3).map(c=>`<div class="intro-ex-row"><span class="iex-de">${esc(c[0])}</span><span class="iex-es">${esc(c[1])}</span></div>`).join("");
+    // Show the LAST 3 sentences as teaching examples so they don't repeat as the
+    // first practice cards (practice starts at card 0) — keeps the rule slide fresh.
+    const ex=st.cards.slice(-3).map(c=>`<div class="intro-ex-row"><span class="iex-de">${esc(c[0])}</span><span class="iex-es">${esc(c[1])}</span></div>`).join("");
     $("#structIntro").innerHTML=`<div class="panel">
       <div class="cd" style="letter-spacing:.08em">DIE REGEL</div>
       <div class="st-name" style="font-family:var(--serif);font-size:20px;margin-top:4px">${esc(st.name)} <span class="lvlmini">${esc(st.level)}</span></div>
