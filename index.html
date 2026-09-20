@@ -748,8 +748,8 @@
   /* ---------- persistence ---------- */
   const LS="frecuencia.v1";
   const defaults={cards:{}, settings:{newPer:15, modes:{listen:true,read:true,produce:true}, autoplay:true},
-                  streak:0, lastDay:null, theme:null, talks:[], lastEval:null, lastEvalResult:null, custom:[], activeStructures:[], level:"A2", register:"auto", mistakes:[], lastLessonDay:null, storyCache:{}, verbKnown:{}, conjMistakes:[], conjKnown:{}};
-  function load(){ try{const j=JSON.parse(localStorage.getItem(LS)); if(j)return Object.assign({},defaults,j,{settings:Object.assign({},defaults.settings,j.settings),cards:j.cards||{},talks:j.talks||[],custom:j.custom||[],activeStructures:j.activeStructures||[],mistakes:j.mistakes||[],storyCache:j.storyCache||{},verbKnown:j.verbKnown||{},conjMistakes:j.conjMistakes||[],conjKnown:j.conjKnown||{}});}catch(e){} return JSON.parse(JSON.stringify(defaults)); }
+                  streak:0, lastDay:null, theme:null, talks:[], lastEval:null, lastEvalResult:null, custom:[], activeStructures:[], level:"A2", register:"auto", mistakes:[], lastLessonDay:null, storyCache:{}, verbKnown:{}, conjMistakes:[], conjKnown:{}, customVerbs:[]};
+  function load(){ try{const j=JSON.parse(localStorage.getItem(LS)); if(j)return Object.assign({},defaults,j,{settings:Object.assign({},defaults.settings,j.settings),cards:j.cards||{},talks:j.talks||[],custom:j.custom||[],activeStructures:j.activeStructures||[],mistakes:j.mistakes||[],storyCache:j.storyCache||{},verbKnown:j.verbKnown||{},conjMistakes:j.conjMistakes||[],conjKnown:j.conjKnown||{},customVerbs:j.customVerbs||[]});}catch(e){} return JSON.parse(JSON.stringify(defaults)); }
   function save(){ try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){} }
   let state=load();
 
@@ -807,6 +807,19 @@
       DECK.push({id:"vb_"+i, verbIdx:i, es:v[0], de:v[1], pos:(v[2]?"Verb":"Verb · unregelmäßig"), type:"verb", exEs:"", exDe:""}); }
   }
   appendVerbCards();
+
+  /* verbs the user added from the reading glossary → always in the "Infinitive lernen" pool */
+  const inVerbList=(k)=>(window.VERBLIST||[]).some(x=>String(x[0]).toLowerCase()===k);
+  function appendCustomVerbs(){
+    (state.customVerbs||[]).forEach((cv,i)=>{ const k=(cv.inf||"").toLowerCase(); if(!k||deckSeen.has(k)||inVerbList(k))return; deckSeen.add(k);
+      DECK.push({id:"cvb_"+i, es:cv.inf, de:cv.de, pos:"Verb", type:"verb", customVerb:true, exEs:"", exDe:""}); });
+  }
+  appendCustomVerbs();
+  function addVerbToDeck(inf,de){ inf=(inf||"").trim(); const k=inf.toLowerCase(); if(!k||deckSeen.has(k)||inVerbList(k)) return 0;
+    deckSeen.add(k); const i=(state.customVerbs=state.customVerbs||[]).length;
+    state.customVerbs.push({inf,de:de||""});
+    DECK.push({id:"cvb_"+i, es:inf, de:de||"", pos:"Verb", type:"verb", customVerb:true, exEs:"", exDe:""});
+    save(); return 1; }
 
   /* card SRS record: {phase:'learning'|'review', step, ease, ivl(days), reps, lapses, due} */
   function rec(id){ return state.cards[id]; }
@@ -1828,6 +1841,7 @@
   const HIST_THEMES=["Al-Ándalus y la España musulmana","la Reconquista","los Reyes Católicos (Isabel y Fernando)","el descubrimiento de América en 1492","Cristóbal Colón","el Siglo de Oro español","la Armada Invencible","los romanos en Hispania","un rey o una reina de España","una ciudad histórica española (Toledo, Sevilla o Granada)","el Camino de Santiago","la Transición a la democracia","un invento o descubrimiento de España","los pueblos antiguos de Iberia (íberos y celtas)","un gran pintor español (Velázquez, Goya o Picasso)","la Alhambra de Granada","el flamenco y su origen","la Guerra Civil española (de forma breve y neutral)"];
   const BIBLE_PASSAGES=["la Creación (Génesis 1)","Adán y Eva en el jardín","Noé y el arca","Moisés y el Mar Rojo","los Diez Mandamientos","David y Goliat","el Salmo 23 (El Señor es mi pastor)","Daniel en el foso de los leones","Jonás y el gran pez","el nacimiento de Jesús","el buen samaritano","el hijo pródigo","Jesús calma la tormenta","la última cena","el Padre Nuestro","la multiplicación de los panes","la oveja perdida"];
   const pickOne=(a)=>a[Math.floor(Math.random()*a.length)];
+  const GLOS_RULE='En cada entrada del glosario añade también un campo "inf": si la palabra es un VERBO, pon su INFINITIVO (p. ej. "decir" para «dijo», "levantarse" para «se levantó»), y la traducción alemana "de" también en infinitivo (p. ej. «sagen»); si NO es un verbo, deja "inf" como cadena vacía "".';
   async function makeStory(topic){
     const lvl=state.level||"A2";
     const kind=STORY_KIND[topic];
@@ -1837,17 +1851,19 @@
       prompt=[
         "Escribe un texto informativo MUY corto en español para un aprendiz de nivel "+lvl+" sobre un hecho o tema REAL de la historia de España: "+tema+".",
         "5-8 frases, claras y precisas, con vocabulario y gramática adecuados a ese nivel. Debe ser verídico e interesante, como un pequeño artículo.",
-        'Devuelve SOLO un objeto JSON: {"titulo":"el tema","texto":"el texto completo","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
-        "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana."
+        'Devuelve SOLO un objeto JSON: {"titulo":"el tema","texto":"el texto completo","glosario":[{"es":"palabra o expresión tal como aparece en el texto","inf":"infinitivo si es verbo, si no vacío","de":"traducción alemana"}]}.',
+        "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana.",
+        GLOS_RULE
       ].join("\n");
     } else if(kind==="bible"){
       const pas=pickOne(BIBLE_PASSAGES);
       prompt=[
         "Cuenta en español, de forma sencilla y fiel, un pasaje conocido de la Biblia para un aprendiz de nivel "+lvl+": "+pas+".",
         "4-7 frases en un español claro adaptado a ese nivel. No copies una traducción concreta: cuéntalo con tus propias palabras respetando el contenido.",
-        'Devuelve SOLO un objeto JSON: {"titulo":"nombre del pasaje seguido del libro (y capítulo si lo sabes) entre paréntesis, p. ej. «El hijo pródigo (Lucas 15)» o «La Creación (Génesis 1)»","texto":"el pasaje completo","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
+        'Devuelve SOLO un objeto JSON: {"titulo":"nombre del pasaje seguido del libro (y capítulo si lo sabes) entre paréntesis, p. ej. «El hijo pródigo (Lucas 15)» o «La Creación (Génesis 1)»","texto":"el pasaje completo","glosario":[{"es":"palabra o expresión tal como aparece en el texto","inf":"infinitivo si es verbo, si no vacío","de":"traducción alemana"}]}.',
         "El título SIEMPRE debe terminar con el libro de la Biblia entre paréntesis para poder ubicar el pasaje.",
-        "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana."
+        "En glosario incluye 6-10 palabras o expresiones útiles del texto con su traducción alemana.",
+        GLOS_RULE
       ].join("\n");
     } else {
     const withDialog=Math.random()<0.45;
@@ -1855,8 +1871,9 @@
       "Escribe una historia MUY corta en español para un aprendiz de nivel "+lvl+" sobre: "+topic+".",
       "5-8 frases, vocabulario y gramática adecuados a ese nivel, natural y entretenida.",
       withDialog ? "Incluye DIÁLOGO entre dos personas (usa guiones — para las intervenciones), no solo narración." : "Escríbela como una narración breve.",
-      'Devuelve SOLO un objeto JSON: {"titulo":"...","texto":"la historia completa","glosario":[{"es":"palabra o expresión del texto","de":"traducción alemana"}]}.',
-      "En glosario incluye 6-10 palabras o expresiones útiles que aparecen en el texto, con su traducción alemana."
+      'Devuelve SOLO un objeto JSON: {"titulo":"...","texto":"la historia completa","glosario":[{"es":"palabra o expresión tal como aparece en el texto","inf":"infinitivo si es verbo, si no vacío","de":"traducción alemana"}]}.',
+      "En glosario incluye 6-10 palabras o expresiones útiles que aparecen en el texto, con su traducción alemana.",
+      GLOS_RULE
     ].join("\n");
     }
     for(let attempt=0; attempt<2; attempt++){
@@ -1905,16 +1922,23 @@
       <div style="margin-top:14px"><div class="cd" style="margin-bottom:6px">Wörter (antippen):</div><div class="vocab-list" id="glosList"></div></div>
     </div>`;
     const glosList=$("#glosList");
-    glos.forEach((g,i)=>{ const row=document.createElement("div"); row.className="vocab-row"; row.style.cursor="pointer"; row.innerHTML=`<span class="ves">${esc(g.es||"")}</span><span class="vde">${esc(g.de||"")}</span>`; row.onclick=()=>showWpop(g); glosList.appendChild(row); });
+    const vtag='<span style="font-size:10px;color:var(--accent);border:1px solid var(--line-strong);border-radius:6px;padding:1px 5px;margin-left:6px;vertical-align:middle">Verb</span>';
+    glos.forEach((g,i)=>{ const row=document.createElement("div"); row.className="vocab-row"; row.style.cursor="pointer";
+      const term=(g.inf&&g.inf.trim())? esc(g.inf)+vtag : esc(g.es||"");
+      row.innerHTML=`<span class="ves">${term}</span><span class="vde">${esc(g.de||"")}</span>`; row.onclick=()=>showWpop(g); glosList.appendChild(row); });
     $("#lesenResult").querySelectorAll(".prose .w").forEach(el=>el.onclick=()=>{ const g=glos[+el.dataset.gi]; if(g) showWpop(g); });
     $("#storyRead").onclick=()=>speak(d.texto||"");
-    $("#storyAddAll").onclick=()=>{ const n=addVocabToDeck(glos.map(g=>({es:g.es,de:g.de}))); toast((n||0)+" Wörter hinzugefügt"); };
+    $("#storyAddAll").onclick=()=>{ let nv=0,nw=0;
+      glos.forEach(g=>{ if(g.inf&&g.inf.trim()){ nv+=addVerbToDeck(g.inf,g.de); } else { nw+=addVocabToDeck([{es:g.es,de:g.de}]); } });
+      toast((nw+nv)+" hinzugefügt"+(nv?(" · "+nv+" ins Verben-Deck"):"")); };
   }
   function showWpop(g){
     const host=$("#wpopHost"); if(!host)return;
-    host.innerHTML=`<div class="wpop"><span class="we">${esc(g.es||"")}</span><span class="wd">${esc(g.de||"")}</span><button id="wpopAudio" type="button" aria-label="Anhören">🔊</button><button id="wpopDeck" type="button">+ Deck</button></div>`;
-    $("#wpopAudio").onclick=()=>speak(g.es||"");
-    $("#wpopDeck").onclick=()=>{ const n=addVocabToDeck([{es:g.es,de:g.de}]); toast(n? (g.es+" ins Deck ✓"):"schon im Deck"); };
+    const isVerb=!!(g.inf&&g.inf.trim()); const head=isVerb? g.inf : (g.es||"");
+    const vtag=isVerb?'<span style="font-size:10px;color:var(--accent);border:1px solid var(--line-strong);border-radius:6px;padding:1px 5px;margin-left:6px">Verb</span>':"";
+    host.innerHTML=`<div class="wpop"><span class="we">${esc(head)}</span>${vtag}<span class="wd">${esc(g.de||"")}</span><button id="wpopAudio" type="button" aria-label="Anhören">🔊</button><button id="wpopDeck" type="button">${isVerb?"+ Verben":"+ Deck"}</button></div>`;
+    $("#wpopAudio").onclick=()=>speak(head);
+    $("#wpopDeck").onclick=()=>{ if(isVerb){ const n=addVerbToDeck(g.inf,g.de); toast(n? (g.inf+" ins Verben-Deck ✓"):"Verb schon dabei"); } else { const n=addVocabToDeck([{es:g.es,de:g.de}]); toast(n? (g.es+" ins Deck ✓"):"schon im Deck"); } };
   }
 
   /* extra keyboard: drill screen */
@@ -2020,7 +2044,7 @@
   $("#verbInfStart").onclick=startVerbInf;
   function startVerbInf(){
     const limit = verbInfCount==="all" ? CORE_VERB_COUNT : Math.min(verbInfCount, CORE_VERB_COUNT);
-    const pool = DECK.filter(w=>w.type==="verb" && w.verbIdx<limit);
+    const pool = DECK.filter(w=>w.type==="verb" && (w.customVerb || w.verbIdx<limit));
     const t=now();
     const due = pool.filter(w=>state.cards[w.id] && state.cards[w.id].due<=t).map(w=>w.id);
     const neu = pool.filter(w=>!state.cards[w.id]).slice(0, Math.max(10, state.settings.newPer)).map(w=>w.id);
