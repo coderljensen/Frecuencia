@@ -622,7 +622,7 @@
   <section id="tab-talk" hidden>
     <div class="panel talk-intro" id="talkIntro">
       <h2>Sprechen üben — wie ein echtes Gespräch</h2>
-      <p class="hint">Du sprichst frei auf Spanisch, <b>ohne Senden-Knopf</b>. Machst du eine kurze Pause, antwortet Lucía automatisch und liest ihre Antwort vor. Sprich danach einfach weiter.</p>
+      <p class="hint">Du sprichst frei auf Spanisch und Lucía liest ihre Antwort vor. Beim <b>Antwort-Modus</b> unten wählst du, ob sie nach einer kurzen Pause automatisch antwortet — oder erst, wenn du auf <b>„Fertig — senden"</b> tippst (dann kannst du in Ruhe ausreden und nachdenken).</p>
       <div class="talk-setup">
         <div class="ctrl" style="padding-top:0"><div><div class="cl">Worüber möchtest du reden?</div><div class="cd">Lucía passt alles an dein Niveau an</div></div></div>
         <div class="topics" id="starters">
@@ -648,6 +648,11 @@
           <button class="chip" data-reg="slang" aria-pressed="false"><span class="dot"></span>Locker (viel Slang)</button>
           <button class="chip" data-reg="neutral" aria-pressed="false"><span class="dot"></span>Neutral</button>
         </div>
+        <div class="ctrl"><div><div class="cl">Antwort-Modus</div><div class="cd">Wann Lucía antwortet — auf Knopfdruck lässt sie dich in Ruhe ausreden</div></div></div>
+        <div class="topics" id="talkModes">
+          <button class="chip" data-tmode="auto" aria-pressed="true"><span class="dot"></span>Automatisch (nach Pause)</button>
+          <button class="chip" data-tmode="manual" aria-pressed="false"><span class="dot"></span>Auf Knopfdruck (Senden)</button>
+        </div>
       </div>
       <button class="cta" id="talkStart">Gespräch starten</button>
       <p class="micnote" id="micNote"></p>
@@ -664,6 +669,7 @@
       <div class="chat" id="chat"></div>
       <div class="interim" id="interim" hidden></div>
       <div class="talk-controls">
+        <button class="cta" id="sendTurn" type="button" style="margin:0 0 8px 0" hidden>✅ Fertig — an Lucía senden</button>
         <div class="talk-btnrow">
           <button class="cta ghost" id="micToggle" style="margin:0;flex:1">🎤 Mikro pausieren</button>
           <button class="cta ghost" id="wordCatch" type="button" style="margin:0;flex:0 0 auto" title="Fehlendes Wort merken">🔤 Wort?</button>
@@ -747,7 +753,7 @@
 
   /* ---------- persistence ---------- */
   const LS="frecuencia.v1";
-  const defaults={cards:{}, settings:{newPer:15, modes:{listen:true,read:true,produce:true}, autoplay:true},
+  const defaults={cards:{}, settings:{newPer:15, modes:{listen:true,read:true,produce:true}, autoplay:true, talkManual:false},
                   streak:0, lastDay:null, theme:null, talks:[], lastEval:null, lastEvalResult:null, custom:[], activeStructures:[], level:"A2", register:"auto", mistakes:[], lastLessonDay:null, storyCache:{}, verbKnown:{}, conjMistakes:[], conjKnown:{}, customVerbs:[]};
   function load(){ try{const j=JSON.parse(localStorage.getItem(LS)); if(j)return Object.assign({},defaults,j,{settings:Object.assign({},defaults.settings,j.settings),cards:j.cards||{},talks:j.talks||[],custom:j.custom||[],activeStructures:j.activeStructures||[],mistakes:j.mistakes||[],storyCache:j.storyCache||{},verbKnown:j.verbKnown||{},conjMistakes:j.conjMistakes||[],conjKnown:j.conjKnown||{},customVerbs:j.customVerbs||[]});}catch(e){} return JSON.parse(JSON.stringify(defaults)); }
   function save(){ try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){} }
@@ -1248,6 +1254,22 @@
   let micBlocked=false, lastMicReason="";
   const SILENCE_MS=1700;   // pause before Lucía answers — high enough to not split two sentences
   let capturing=false;     // true only while actively listening for the current turn
+  const talkManual=()=>!!(state.settings&&state.settings.talkManual);
+  // Collapse the immediate repeated blocks the speech recognizer sometimes loops
+  // ("me gusta el café eh me gusta el café eh" → "me gusta el café eh").
+  function collapseRepeats(s){
+    let w=String(s||"").trim().split(/\s+/).filter(Boolean); if(w.length<2) return w.join(" ");
+    let changed=true, guard=0;
+    while(changed && guard++<200){ changed=false;
+      for(let n=6;n>=1 && !changed;n--){
+        for(let i=0;i+2*n<=w.length;i++){
+          const a=w.slice(i,i+n).join(" ").toLowerCase(), b=w.slice(i+n,i+2*n).join(" ").toLowerCase();
+          if(a===b){ w.splice(i+n,n); changed=true; break; }
+        }
+      }
+    }
+    return w.join(" ");
+  }
 
   async function ensureMic(){
     try{
@@ -1282,7 +1304,7 @@
 
   function renderTalkIntro(){
     $("#talkIntro").hidden=false; $("#talkLive").hidden=true;
-    syncLevelChips(); syncRegisterChips();
+    syncLevelChips(); syncRegisterChips(); syncTalkModeChips();
     const note=$("#micNote");
     if(!SR){ note.textContent="Hinweis: Dein Browser kann keine durchgehende Spracherkennung (z. B. Safari auf dem iPhone). Du kannst per Texteingabe üben — oder die App in Chrome öffnen."; note.className="micnote warn"; }
     else { note.textContent="Beim Start fragt der Browser nach dem Mikrofon. Kopfhörer sind nicht nötig — das Mikro ist stumm, während Lucía spricht, und hört erst danach wieder zu."; note.className="micnote"; }
@@ -1301,8 +1323,13 @@
     c.setAttribute("aria-pressed","true"); state.register=c.dataset.reg||"auto"; save();
   });
   function syncRegisterChips(){ document.querySelectorAll("#registers .chip").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.reg===(state.register||"auto")))); }
+  document.querySelectorAll("#talkModes .chip").forEach(c=>c.onclick=()=>{
+    document.querySelectorAll("#talkModes .chip").forEach(x=>x.setAttribute("aria-pressed","false"));
+    c.setAttribute("aria-pressed","true"); state.settings.talkManual=(c.dataset.tmode==="manual"); save();
+  });
+  function syncTalkModeChips(){ document.querySelectorAll("#talkModes .chip").forEach(x=>x.setAttribute("aria-pressed",String((x.dataset.tmode==="manual")===talkManual()))); }
 
-  function setState(s,txt){ talkState=s; const orb=$("#orb"); if(orb) orb.className="orb "+(s==="idle"?"":s); const st=$("#statusTxt"); if(st)st.textContent=txt||""; }
+  function setState(s,txt){ talkState=s; const orb=$("#orb"); if(orb) orb.className="orb "+(s==="idle"?"":s); const st=$("#statusTxt"); if(st)st.textContent=txt||""; if(typeof updateSendTurnBtn==="function") updateSendTurnBtn(); }
 
   function buildSystem(){
     if(starterType==="monolog"){
@@ -1452,14 +1479,17 @@
       recog.onerror=(e)=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed"||e.error==="audio-capture") micDenied(e.error); };
       recog.onend=()=>{ if(talkState==="listening" && !restartGuard){ try{recog.start();}catch(e){} } };
       recog.start();
-      setState("listening","Ich höre zu … sprich einfach.");
+      setState("listening", talkManual()? "Sprich in Ruhe — dann auf „Fertig — senden“ tippen." : "Ich höre zu … sprich einfach.");
+      updateSendTurnBtn();
       startSilenceWatch();
     }catch(e){ setState("idle","Mikro nicht verfügbar."); }
   }
+  function updateSendTurnBtn(){ const b=$("#sendTurn"); if(!b)return; b.hidden = !(talkManual() && talkState==="listening" && !micPaused && !micBlocked); }
   function startSilenceWatch(){
     clearInterval(silenceTimer); lastSpeechAt=now();
     silenceTimer=setInterval(()=>{
       if(talkState!=="listening") return;
+      if(talkManual()) return;   // manual mode: only send when the user taps the button
       if(finalBuf.trim() && (now()-lastSpeechAt)>SILENCE_MS) finalizeUserTurn();
     },250);
   }
@@ -1467,12 +1497,13 @@
     if(!capturing) return;                 // run once per listen cycle
     capturing=false;
     clearInterval(silenceTimer);
-    const text=finalBuf.trim(); finalBuf=""; hideInterim();
+    const text=collapseRepeats(finalBuf.trim()); finalBuf=""; hideInterim();
     restartGuard=true; stopRecog();
     if(text.length<2){ if(!micPaused) startListening(); return; }   // ignore noise/blips
     addMsg("me",text); convo.push({role:"me",text}); save();
     botReply(false);
   }
+  $("#sendTurn").onclick=()=>{ if(talkState==="listening") finalizeUserTurn(); };
   function stopRecog(){ capturing=false; try{ if(recog){ recog.onend=null; recog.onresult=null; recog.stop(); } }catch(e){} recog=null; }
 
   $("#micToggle").onclick=()=>{
